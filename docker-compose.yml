@@ -1,0 +1,17 @@
+services:
+  flyway:
+    image: flyway/flyway
+    container_name: flight_delays_flyway
+    restart: no
+    environment:
+      - FLYWAY_URL=jdbc:postgresql://central-postgres:5432/flight_delays
+      - FLYWAY_USER=${POSTGRES_USER}
+      - FLYWAY_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - ./migrations:/flyway/sql
+    networks:
+      - central-db_default
+
+networks:
+  central-db_default:
+    external: true
