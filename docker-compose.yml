@@ -7,6 +7,7 @@ services:
       - FLYWAY_URL=jdbc:postgresql://central-postgres:5432/flight_delays
       - FLYWAY_USER=${POSTGRES_USER}
       - FLYWAY_PASSWORD=${POSTGRES_PASSWORD}
+      - FLYWAY_CLEAN_DISABLED=false
     volumes:
       - ./migrations:/flyway/sql
     networks:
