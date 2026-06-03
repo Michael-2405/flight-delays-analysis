@@ -1,0 +1,20 @@
+[project]
+name = "flight-delays-analysis"
+version = "1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "python-dotenv",
+  "pydantic",
+  "pydantic-settings",
+  "polars",
+  "sqlalchemy",
+  "loguru>=0.7.3",
+  "pandera>=0.31.1",
+]
+
+[dependency-groups]
+dev = ["ruff", "pytest"]
+
+[tool.pytest.ini_options]
+addopts = "-v"
+testpaths = ["tests"]
