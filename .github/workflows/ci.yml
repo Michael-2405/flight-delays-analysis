@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  ci:
+    name: Lint, Migrate and Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      RAW_DATA_PATH: data/raw/
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Install Python ──────────────────────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ── 3. Install uv ──────────────────────────────────────
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      # ── 4. Install dependencies ────────────────────────────
+      - name: Install dependencies
+        run: uv sync
+
+      # ── 5. Linting ─────────────────────────────────────────
+      - name: Lint with ruff
+        run: uv run ruff check .
+
+      # ── 6. Formatting ──────────────────────────────────────
+      - name: Check formatting with ruff
+        run: uv run ruff format --check .
+
+      # ── 7. Flyway migrations ───────────────────────────────
+      - name: Run Flyway migrations
+        uses: docker://flyway/flyway:10
+        with:
+          args: migrate
+        env:
+          FLYWAY_URL: jdbc:postgresql://localhost:5432/${{ secrets.POSTGRES_DB }}
+          FLYWAY_USER: ${{ secrets.POSTGRES_USER }}
+          FLYWAY_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          FLYWAY_LOCATIONS: filesystem:./migrations
+
+      # ── 8. Tests ───────────────────────────────────────────
+      - name: Run tests
+        run: uv run pytest tests/ -v
