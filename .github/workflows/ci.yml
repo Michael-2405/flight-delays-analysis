@@ -63,14 +63,16 @@ jobs:
 
       # ── 7. Flyway migrations ───────────────────────────────
       - name: Run Flyway migrations
-        uses: docker://flyway/flyway:10
-        with:
-          args: migrate
-        env:
-          FLYWAY_URL: jdbc:postgresql://localhost:5432/${{ secrets.POSTGRES_DB }}
-          FLYWAY_USER: ${{ secrets.POSTGRES_USER }}
-          FLYWAY_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          FLYWAY_LOCATIONS: filesystem:./migrations
+        run: |
+          docker run --rm \
+            --network host \
+            -v ${{ github.workspace }}/migrations:/flyway/sql \
+            flyway/flyway:10 \
+            -url="jdbc:postgresql://localhost:5432/${{ secrets.POSTGRES_DB }}" \
+            -user="${{ secrets.POSTGRES_USER }}" \
+            -password="${{ secrets.POSTGRES_PASSWORD }}" \
+            -locations="filesystem:/flyway/sql" \
+            migrate
 
       # ── 8. Tests ───────────────────────────────────────────
       - name: Run tests
