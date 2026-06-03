@@ -1,6 +1,7 @@
 # Pull Request
 
 ## Type of Change
+
 Select all that apply:
 
 - [ ] New feature
@@ -22,7 +23,8 @@ Select all that apply:
 - [ ] Data backfill required
 - [ ] ETL logic updated
 
-### Details:
+### Details
+
 Describe the data model, migration, ETL, or reporting impact.
 
 ---
@@ -30,9 +32,11 @@ Describe the data model, migration, ETL, or reporting impact.
 ## Description
 
 ### Why?
+
 Describe the problem, requirement, or business need.
 
 ### What?
+
 Describe the solution implemented.
 
 ---
