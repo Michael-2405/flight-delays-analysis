@@ -11,3 +11,6 @@ dependencies = [
   "loguru>=0.7.3",
   "pandera>=0.31.1",
 ]
+
+[dependency-groups]
+dev = ["ruff", "pytest"]
