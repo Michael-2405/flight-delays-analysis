@@ -15,7 +15,7 @@ class AirportRepository:
         session.add_all(records)
 
 
-class FlightRepository:
+class FlightsRepository:
     def insert_batch(self, rows: list[dict]) -> None:
         metadata = MetaData(schema="bronze")
 
