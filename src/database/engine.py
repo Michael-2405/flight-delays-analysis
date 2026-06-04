@@ -4,10 +4,10 @@ from config.settings import settings
 
 DATABASE_URL = (
     f"postgresql+psycopg://"
-    f"{settings.postgres_user}"
-    f"{settings.postgres_password}"
-    f"{settings.postgres_host}"
-    f"{settings.postgres_port}"
+    f"{settings.postgres_user}:"
+    f"{settings.postgres_password}@"
+    f"{settings.postgres_host}:"
+    f"{settings.postgres_port}/"
     f"{settings.postgres_db}"
 )
 

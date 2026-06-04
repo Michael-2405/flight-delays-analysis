@@ -1,48 +1,27 @@
+from datetime import datetime
 from pathlib import Path
 
 from loguru import logger
-from sqlalchemy.orm import Session
 
-from database.engine import engine
-from database.models import AirportRaw
-from database.repositories import AirportRepository
+from database.airports_repository import AirportsRepository
 from readers.csv_reader import CsvReader
 from validators.airports_schema import airports_schema
 
 
 class AirportsPipeline:
-    def run(
-        self,
-        file_path: Path,
-    ) -> None:
-
+    def run(self, file_path: Path) -> None:
         logger.info("Loading airports")
-
         df = CsvReader.read(file_path)
-
         airports_schema.validate(df)
-
-        records = [
-            AirportRaw(
-                iata_code=row["IATA_CODE"],
-                airport=row["AIRPORT"],
-                city=row["CITY"],
-                state=row["STATE"],
-                country=row["COUNTRY"],
-                latitude=row["LATITUDE"],
-                longitude=row["LONGITUDE"],
-            )
+        rows = [
+            {col.lower(): val for col, val in row.items()}
+            | {
+                "source_file": str(file_path.name),
+                "loaded_at": datetime.now(),
+            }
             for row in df.to_dicts()
         ]
-
-        repo = AirportRepository()
-
-        with Session(engine) as session:
-            repo.insert(
-                session,
-                records,
-            )
-
-            session.commit()
-
+        repo = AirportsRepository()
+        repo.truncate()
+        repo.insert(rows)
         logger.success("Airports loaded")

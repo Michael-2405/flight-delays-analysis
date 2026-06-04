@@ -12,6 +12,7 @@ dependencies = [
   "sqlalchemy",
   "loguru>=0.7.3",
   "pandera>=0.31.1",
+  "psycopg>=3.3.4",
 ]
 [dependency-groups]
 dev = ["ruff", "pytest"]
@@ -20,3 +21,6 @@ dev = ["ruff", "pytest"]
 
 addopts = "-v"
 testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

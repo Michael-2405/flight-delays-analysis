@@ -7,8 +7,8 @@ airports_schema = pa.DataFrameSchema(
         "CITY": pa.Column(str, nullable=False),
         "STATE": pa.Column(str, nullable=False),
         "COUNTRY": pa.Column(str, nullable=False),
-        "LATITUDE": pa.Column(float, nullable=False),
-        "LONGITUDE": pa.Column(float, nullable=False),
+        "LATITUDE": pa.Column(float, nullable=True),
+        "LONGITUDE": pa.Column(float, nullable=True),
     },
     strict=True,
 )

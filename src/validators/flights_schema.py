@@ -8,7 +8,7 @@ flights_schema = pa.DataFrameSchema(
         "DAY_OF_WEEK": pa.Column(int),
         "AIRLINE": pa.Column(str),
         "FLIGHT_NUMBER": pa.Column(int),
-        "TAIL_NUMBER": pa.Column(int),
+        "TAIL_NUMBER": pa.Column(str),
     },
     strict=True,
 )
