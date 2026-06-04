@@ -10,21 +10,24 @@ from database.flights_repository import FlightRepository
 class FlightPipeline:
     BATCH_SIZE = 100_000
 
-    def run(self, file_path: Path) -> None:
-        logger.info("Loading flights")
+    def run(self, file_path: Path) -> int:
+        logger.info(f"Starting flights ingestion from {file_path.name}")
+
         repo = FlightRepository()
         reader = pl.read_csv_batched(file_path, batch_size=self.BATCH_SIZE)
 
         repo.truncate()
-        counter = 0
-        logger.info(f"Starting flights ingestion from {file_path.name}")
+
+        batch_counter = 0
+        total_rows = 0
+
         while True:
             batches = reader.next_batches(1)
             if not batches:
                 break
-            batch = batches[0]
 
-            counter += 1
+            batch = batches[0]
+            batch_counter += 1
             rows = [
                 {col.lower(): val for col, val in row.items()}
                 | {
@@ -33,7 +36,14 @@ class FlightPipeline:
                 }
                 for row in batch.to_dicts()
             ]
-            logger.info(f"Processing batch {counter} — {len(rows):,} rows")
+
+            total_rows += len(rows)
+            logger.info(
+                f"Batch {batch_counter} — {len(rows):,} rows — {total_rows:,} total"
+            )
             repo.insert_batch_copy(rows, source_file=str(file_path.name))
-            logger.info(f"Total batches processed: {counter}")
-        logger.success("Flights loaded")
+
+        logger.success(
+            f"Flights loaded — {batch_counter} batches — {total_rows:,} rows"
+        )
+        return total_rows

@@ -13,12 +13,17 @@ def main() -> None:
     configure_logging()
 
     raw_path = Path(settings.raw_data_path)
+    total = 0
 
-    AirlinePipeline().run(raw_path / "airlines.csv")
-    AirportPipeline().run(file_path=raw_path / "airports.csv")
-    FlightPipeline().run(file_path=raw_path / "flights.csv")
+    total += AirlinePipeline().run(raw_path / "airlines.csv")
+    logger.info(f"Cumulative rows processed: {total:,}")
 
-    logger.success("Pipeline completed")
+    total += AirportPipeline().run(file_path=raw_path / "airports.csv")
+    logger.info(f"Cumulative rows processed: {total:,}")
+
+    total += FlightPipeline().run(file_path=raw_path / "flights.csv")
+
+    logger.success(f"Pipeline completed — {total:,} total rows processed")
 
 
 if __name__ == "__main__":

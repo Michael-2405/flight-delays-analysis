@@ -9,7 +9,7 @@ from validators.airlines_schema import airlines_schema
 
 
 class AirlinePipeline:
-    def run(self, file_path: Path) -> None:
+    def run(self, file_path: Path) -> int:
         logger.info("Loading airlines")
         df = CsvReader.read(file_path)
         airlines_schema.validate(df)
@@ -25,3 +25,4 @@ class AirlinePipeline:
         repo.truncate()
         repo.insert(rows)
         logger.success("Airlines loaded")
+        return len(rows)

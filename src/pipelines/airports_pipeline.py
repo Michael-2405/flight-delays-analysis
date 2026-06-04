@@ -9,7 +9,7 @@ from validators.airports_schema import airports_schema
 
 
 class AirportPipeline:
-    def run(self, file_path: Path) -> None:
+    def run(self, file_path: Path) -> int:
         logger.info("Loading airports")
         df = CsvReader.read(file_path)
         airports_schema.validate(df)
@@ -25,3 +25,4 @@ class AirportPipeline:
         repo.truncate()
         repo.insert(rows)
         logger.success("Airports loaded")
+        return len(rows)
