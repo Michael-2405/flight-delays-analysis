@@ -10,6 +10,13 @@ def configure_logging() -> None:
     logger.remove()
 
     logger.add(
+        sys.stdout,
+        level="INFO",
+        colorize=True,
+        format="<green>{time:HH:mm:ss}</green> | <level>{level}</level> | {message}",
+    )
+
+    logger.add(
         "logs/pipeline.log",
         level="INFO",
         rotation="10 MB",
@@ -17,5 +24,3 @@ def configure_logging() -> None:
         compression="zip",
         enqueue=True,
     )
-
-    logger.add(sys.stdout, level="INFO", colorize=True)

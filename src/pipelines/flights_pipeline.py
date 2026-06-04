@@ -16,11 +16,15 @@ class FlightPipeline:
         reader = pl.read_csv_batched(file_path, batch_size=self.BATCH_SIZE)
 
         repo.truncate()
+        counter = 0
+        logger.info(f"Starting flights ingestion from {file_path.name}")
         while True:
             batches = reader.next_batches(1)
             if not batches:
                 break
             batch = batches[0]
+
+            counter += 1
             rows = [
                 {col.lower(): val for col, val in row.items()}
                 | {
@@ -29,5 +33,7 @@ class FlightPipeline:
                 }
                 for row in batch.to_dicts()
             ]
-            repo.insert_batch(rows)
+            logger.info(f"Processing batch {counter} — {len(rows):,} rows")
+            repo.insert_batch_copy(rows, source_file=str(file_path.name))
+            logger.info(f"Total batches processed: {counter}")
         logger.success("Flights loaded")
