@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 from loguru import logger
@@ -16,3 +17,5 @@ def configure_logging() -> None:
         compression="zip",
         enqueue=True,
     )
+
+    logger.add(sys.stdout, level="INFO", colorize=True)

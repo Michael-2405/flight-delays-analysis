@@ -4,15 +4,15 @@ from pathlib import Path
 import polars as pl
 from loguru import logger
 
-from database.flights_repository import FlightsRepository
+from database.flights_repository import FlightRepository
 
 
-class FlightsPipeline:
+class FlightPipeline:
     BATCH_SIZE = 100_000
 
     def run(self, file_path: Path) -> None:
         logger.info("Loading flights")
-        repo = FlightsRepository()
+        repo = FlightRepository()
         reader = pl.read_csv_batched(file_path, batch_size=self.BATCH_SIZE)
 
         repo.truncate()

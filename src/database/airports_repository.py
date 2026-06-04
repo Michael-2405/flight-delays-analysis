@@ -4,7 +4,7 @@ from database.bronze_repository import BronzeRepository
 from database.engine import engine
 
 
-class AirportsRepository(BronzeRepository):
+class AirportRepository(BronzeRepository):
     @property
     def table_name(self) -> str:
         return "airports_raw"

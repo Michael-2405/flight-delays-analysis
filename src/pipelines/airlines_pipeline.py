@@ -3,12 +3,12 @@ from pathlib import Path
 
 from loguru import logger
 
-from database.airlines_repository import AirlinesRepository
+from database.airlines_repository import AirlineRepository
 from readers.csv_reader import CsvReader
 from validators.airlines_schema import airlines_schema
 
 
-class AirlinesPipeline:
+class AirlinePipeline:
     def run(self, file_path: Path) -> None:
         logger.info("Loading airlines")
         df = CsvReader.read(file_path)
@@ -21,7 +21,7 @@ class AirlinesPipeline:
             }
             for row in df.to_dicts()
         ]
-        repo = AirlinesRepository()
+        repo = AirlineRepository()
         repo.truncate()
         repo.insert(rows)
         logger.success("Airlines loaded")
