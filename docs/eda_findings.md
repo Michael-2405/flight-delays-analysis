@@ -42,3 +42,15 @@
 - Decision: proceed with Silver using known 322 airports
 - Future task: enrich airports_raw with DOT→IATA mapping from BTS
 - Source: https://www.transtats.bts.gov
+
+## ⚠️ Technical Debt — fct_flights unique constraint pending
+
+Natural key for fct_flights:
+date_id + airline_id + flight_number + origin_airport_id + destination_airport_id
+
+Cannot be implemented until airport enrichment is complete.
+486,165 flights have NULL origin/destination airport IDs due to
+DOT numeric codes not present in dim_airport.
+
+Resolution: after enriching dim_airport with BTS DOT→IATA mapping,
+add UNIQUE constraint and change INSERT to ON CONFLICT DO NOTHING.
