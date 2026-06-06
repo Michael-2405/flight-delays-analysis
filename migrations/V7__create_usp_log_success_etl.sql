@@ -18,7 +18,7 @@ AS $$
 BEGIN
   UPDATE etl.etl_log
   SET
-    etl_finish       = NOW(),
+    etl_finish       = CLOCK_TIMESTAMP(),
     etl_status       = 'SUCCESS',
     etl_rows_written = p_rows_written,
     etl_rows_updated = p_rows_updated,
