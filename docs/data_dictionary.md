@@ -1,8 +1,8 @@
 # Data Dictionary — Flight Delays Analysis
 
-**Version:** 1.0
-**Last Updated:** 2026-05
-**Database:** PostgreSQL
+**Version:** 1.1
+**Last Updated:** 2026-06
+**Database:** PostgreSQL 16
 
 ---
 
@@ -30,8 +30,8 @@ Raw airport data loaded directly from `airports.csv`.
 | `city` | VARCHAR(100) | YES | City where the airport is located |
 | `state` | VARCHAR(100) | YES | US state where the airport is located |
 | `country` | VARCHAR(100) | YES | Country where the airport is located |
-| `latitude` | DECIMAL(10,6) | YES | Geographic latitude coordinate of the airport |
-| `longitude` | DECIMAL(10,6) | YES | Geographic longitude coordinate of the airport |
+| `latitude` | DECIMAL(10,6) | YES | Geographic latitude coordinate. NULL for ECP, PBG, UST |
+| `longitude` | DECIMAL(10,6) | YES | Geographic longitude coordinate. NULL for ECP, PBG, UST |
 | `source_file` | VARCHAR(500) | NO | Name of the source file this record was loaded from |
 | `loaded_at` | TIMESTAMP | NO | Timestamp when the record was loaded into bronze |
 
@@ -49,12 +49,12 @@ Raw flight data loaded directly from `flights.csv`. One row per flight.
 | `day_of_week` | SMALLINT | YES | Day of the week (1=Monday, 7=Sunday) |
 | `airline` | VARCHAR(10) | YES | IATA 2-letter code of the operating airline |
 | `flight_number` | SMALLINT | YES | Flight number assigned by the airline |
-| `tail_number` | VARCHAR(10) | YES | Unique registration number of the aircraft |
-| `origin_airport` | VARCHAR(10) | YES | IATA code of the departure airport |
-| `destination_airport` | VARCHAR(10) | YES | IATA code of the arrival airport |
+| `tail_number` | VARCHAR(10) | YES | Unique registration number of the aircraft. 14,721 NULLs |
+| `origin_airport` | VARCHAR(10) | YES | IATA code or DOT numeric code of the departure airport |
+| `destination_airport` | VARCHAR(10) | YES | IATA code or DOT numeric code of the arrival airport |
 | `scheduled_departure` | SMALLINT | YES | Scheduled departure time in HHMM format |
 | `departure_time` | SMALLINT | YES | Actual departure time in HHMM format |
-| `departure_delay` | SMALLINT | YES | Departure delay in minutes. Negative = early departure |
+| `departure_delay` | SMALLINT | YES | Departure delay in minutes. Negative = early. NULL when cancelled |
 | `taxi_out` | SMALLINT | YES | Time in minutes between gate departure and wheels off |
 | `wheels_off` | SMALLINT | YES | Actual time wheels left the ground in HHMM format |
 | `scheduled_time` | SMALLINT | YES | Scheduled flight duration in minutes |
@@ -65,10 +65,10 @@ Raw flight data loaded directly from `flights.csv`. One row per flight.
 | `taxi_in` | SMALLINT | YES | Time in minutes between wheels on and gate arrival |
 | `scheduled_arrival` | SMALLINT | YES | Scheduled arrival time in HHMM format |
 | `arrival_time` | SMALLINT | YES | Actual arrival time in HHMM format |
-| `arrival_delay` | SMALLINT | YES | Arrival delay in minutes. Negative = early arrival |
+| `arrival_delay` | SMALLINT | YES | Arrival delay in minutes. Negative = early. NULL when cancelled |
 | `diverted` | SMALLINT | YES | 1 if the flight was diverted to a different airport, 0 otherwise |
 | `cancelled` | SMALLINT | YES | 1 if the flight was cancelled, 0 otherwise |
-| `cancellation_reason` | CHAR(1) | YES | Code indicating the reason for cancellation: A=Carrier, B=Weather, C=NAS, D=Security |
+| `cancellation_reason` | CHAR(1) | YES | A=Carrier, B=Weather, C=NAS, D=Security. NULL when not cancelled |
 | `air_system_delay` | SMALLINT | YES | Minutes of delay caused by the National Air System |
 | `security_delay` | SMALLINT | YES | Minutes of delay caused by security issues |
 | `airline_delay` | SMALLINT | YES | Minutes of delay caused by the airline |
@@ -79,51 +79,147 @@ Raw flight data loaded directly from `flights.csv`. One row per flight.
 
 ---
 
+## silver.airline_clean
+
+Cleaned airline data loaded from `bronze.airlines_raw`.
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `iata_code` | VARCHAR(10) | NO | IATA 2-letter code identifying the airline |
+| `airline_name` | VARCHAR(100) | NO | Full name of the airline (renamed from `airline` in bronze) |
+| `created_at` | TIMESTAMP | NO | Timestamp when the record was created in silver |
+| `updated_at` | TIMESTAMP | YES | Timestamp of the last update to the record |
+
+---
+
+## silver.airport_clean
+
+Cleaned airport data loaded from `bronze.airports_raw`.
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `iata_code` | VARCHAR(10) | NO | IATA 3-letter code identifying the airport |
+| `airport_name` | VARCHAR(200) | NO | Full name of the airport (renamed from `airport` in bronze) |
+| `city` | VARCHAR(100) | YES | City where the airport is located |
+| `state` | VARCHAR(100) | YES | US state where the airport is located |
+| `country` | VARCHAR(100) | YES | Country where the airport is located |
+| `latitude` | DECIMAL(10,6) | YES | Geographic latitude. NULL for ECP, PBG, UST |
+| `longitude` | DECIMAL(10,6) | YES | Geographic longitude. NULL for ECP, PBG, UST |
+| `created_at` | TIMESTAMP | NO | Timestamp when the record was created in silver |
+| `updated_at` | TIMESTAMP | YES | Timestamp of the last update to the record |
+
+---
+
+## silver.flight_clean
+
+Cleaned flight data loaded from `bronze.flights_raw`. One row per flight.
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `year` | SMALLINT | YES | Year the flight operated |
+| `month` | SMALLINT | YES | Month the flight operated (1–12) |
+| `day` | SMALLINT | YES | Day of the month the flight operated |
+| `day_of_week` | SMALLINT | YES | Day of the week (1=Monday, 7=Sunday) |
+| `full_date` | DATE | YES | Full date derived from year, month, day (e.g. 2015-01-15) |
+| `date_id` | INT | YES | Date in YYYYMMDD format for joining with dim_date (e.g. 20150115) |
+| `airline` | VARCHAR(10) | YES | IATA 2-letter code of the operating airline |
+| `flight_number` | SMALLINT | YES | Flight number assigned by the airline |
+| `tail_number` | VARCHAR(10) | YES | Unique registration number of the aircraft. 14,721 NULLs |
+| `origin_airport` | VARCHAR(10) | YES | IATA code or DOT numeric code of the departure airport |
+| `destination_airport` | VARCHAR(10) | YES | IATA code or DOT numeric code of the arrival airport |
+| `scheduled_departure` | SMALLINT | YES | Scheduled departure time in HHMM format |
+| `departure_time` | SMALLINT | YES | Actual departure time in HHMM format |
+| `departure_delay` | SMALLINT | YES | Departure delay in minutes. Negative = early. NULL when cancelled |
+| `taxi_out` | SMALLINT | YES | Time in minutes between gate departure and wheels off |
+| `wheels_off` | SMALLINT | YES | Actual time wheels left the ground in HHMM format |
+| `scheduled_time` | SMALLINT | YES | Scheduled flight duration in minutes |
+| `elapsed_time` | SMALLINT | YES | Actual total flight duration in minutes |
+| `air_time` | SMALLINT | YES | Time in minutes the aircraft was airborne |
+| `distance` | INT | YES | Distance between origin and destination airports in miles |
+| `wheels_on` | SMALLINT | YES | Actual time wheels touched the ground in HHMM format |
+| `taxi_in` | SMALLINT | YES | Time in minutes between wheels on and gate arrival |
+| `scheduled_arrival` | SMALLINT | YES | Scheduled arrival time in HHMM format |
+| `arrival_time` | SMALLINT | YES | Actual arrival time in HHMM format |
+| `arrival_delay` | SMALLINT | YES | Arrival delay in minutes. Negative = early. NULL when cancelled |
+| `diverted` | SMALLINT | NO | 1 if the flight was diverted, 0 otherwise |
+| `cancelled` | SMALLINT | NO | 1 if the flight was cancelled, 0 otherwise |
+| `cancellation_reason` | CHAR(1) | YES | A=Carrier, B=Weather, C=NAS, D=Security. NULL when not cancelled |
+| `air_system_delay` | SMALLINT | YES | Minutes of delay caused by the National Air System |
+| `security_delay` | SMALLINT | YES | Minutes of delay caused by security issues |
+| `airline_delay` | SMALLINT | YES | Minutes of delay caused by the airline |
+| `late_aircraft_delay` | SMALLINT | YES | Minutes of delay caused by a late arriving aircraft |
+| `weather_delay` | SMALLINT | YES | Minutes of delay caused by weather conditions |
+| `created_at` | TIMESTAMP | NO | Timestamp when the record was created in silver |
+| `updated_at` | TIMESTAMP | YES | Timestamp of the last update to the record |
+
+---
+
+## etl.etl_log
+
+Pipeline execution log. One row per stored procedure execution.
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `etl_log_id` | INT | NO | Surrogate key — auto-generated identity |
+| `etl_name` | VARCHAR(100) | NO | Name of the stored procedure that was executed |
+| `etl_start` | TIMESTAMP | NO | Timestamp when the execution started |
+| `etl_finish` | TIMESTAMP | YES | Timestamp when the execution finished |
+| `etl_rows_written` | INT | YES | Number of rows inserted or updated |
+| `etl_rows_updated` | INT | YES | Number of rows updated specifically |
+| `etl_rows_read` | INT | YES | Number of rows read from source |
+| `etl_rows_deleted` | INT | YES | Number of rows deleted |
+| `etl_status` | VARCHAR(50) | YES | Execution status: RUNNING, SUCCESS, FAILED |
+| `etl_error_code` | INT | YES | Error code if execution failed |
+| `etl_error_message` | TEXT | YES | Error message if execution failed |
+| `etl_ran_by` | TEXT | NO | Database user that executed the SP |
+
+---
+
 ## gold.dim_airline
 
-Dimension table containing one row per airline operating US domestic flights.
+*(Pending implementation)*
 
 | Column | Type | Nullable | PK/FK | Description |
 |--------|------|----------|-------|-------------|
-| `airline_id` | INT | NO | PK | Surrogate key — system-generated unique identifier for the airline |
-| `iata_code` | VARCHAR(10) | NO | — | IATA 2-letter code identifying the airline |
+| `airline_id` | INT | NO | PK | Surrogate key |
+| `iata_code` | VARCHAR(10) | NO | — | IATA 2-letter airline code |
 | `airline_name` | VARCHAR(100) | NO | — | Full name of the airline |
 | `created_at` | TIMESTAMP | NO | — | Timestamp when the record was created |
-| `updated_at` | TIMESTAMP | YES | — | Timestamp of the last update to the record |
+| `updated_at` | TIMESTAMP | YES | — | Timestamp of the last update |
 
 ---
 
 ## gold.dim_airport
 
-Dimension table containing one row per airport. Used as both origin and destination in `fct_flights` (role-playing dimension).
+*(Pending implementation)*
 
 | Column | Type | Nullable | PK/FK | Description |
 |--------|------|----------|-------|-------------|
-| `airport_id` | INT | NO | PK | Surrogate key — system-generated unique identifier for the airport |
-| `iata_code` | VARCHAR(10) | NO | — | IATA 3-letter code identifying the airport |
+| `airport_id` | INT | NO | PK | Surrogate key |
+| `iata_code` | VARCHAR(10) | NO | — | IATA 3-letter airport code |
 | `airport_name` | VARCHAR(200) | NO | — | Full name of the airport |
 | `city` | VARCHAR(100) | YES | — | City where the airport is located |
 | `state` | VARCHAR(100) | YES | — | US state where the airport is located |
 | `country` | VARCHAR(100) | YES | — | Country where the airport is located |
-| `latitude` | DECIMAL(10,6) | YES | — | Geographic latitude coordinate of the airport |
-| `longitude` | DECIMAL(10,6) | YES | — | Geographic longitude coordinate of the airport |
-| `timezone` | TEXT | YES | — | Timezone of the airport (e.g. America/New_York) |
+| `latitude` | DECIMAL(10,6) | YES | — | Geographic latitude coordinate |
+| `longitude` | DECIMAL(10,6) | YES | — | Geographic longitude coordinate |
+| `timezone` | TEXT | YES | — | Timezone (e.g. America/New_York) |
 | `created_at` | TIMESTAMP | NO | — | Timestamp when the record was created |
-| `updated_at` | TIMESTAMP | YES | — | Timestamp of the last update to the record |
+| `updated_at` | TIMESTAMP | YES | — | Timestamp of the last update |
 
 ---
 
 ## gold.dim_cancellation_reason
 
-Dimension table containing the four possible cancellation reason codes. Populated via seed data.
+*(Pending implementation)*
 
 | Column | Type | Nullable | PK/FK | Description |
 |--------|------|----------|-------|-------------|
-| `cancellation_reason_id` | INT | NO | PK | Surrogate key — system-generated unique identifier for the cancellation reason |
-| `cancellation_code` | CHAR(1) | NO | — | Single-letter code identifying the cancellation reason: A, B, C, or D |
-| `code_description` | VARCHAR(50) | NO | — | Full description of the cancellation reason code |
+| `cancellation_reason_id` | INT | NO | PK | Surrogate key |
+| `cancellation_code` | CHAR(1) | NO | — | Single-letter code: A, B, C, or D |
+| `code_description` | VARCHAR(50) | NO | — | Full description of the cancellation reason |
 | `created_at` | TIMESTAMP | NO | — | Timestamp when the record was created |
-| `updated_at` | TIMESTAMP | YES | — | Timestamp of the last update to the record |
+| `updated_at` | TIMESTAMP | YES | — | Timestamp of the last update |
 
 **Seed data:**
 
@@ -138,68 +234,66 @@ Dimension table containing the four possible cancellation reason codes. Populate
 
 ## gold.dim_date
 
-Calendar dimension containing one row per day in 2015. Generated programmatically — not loaded from a source file.
+*(Pending implementation)*
 
 | Column | Type | Nullable | PK/FK | Description |
 |--------|------|----------|-------|-------------|
-| `date_id` | INT | NO | PK | Date in YYYYMMDD integer format (e.g. 20150115) |
+| `date_id` | INT | NO | PK | Date in YYYYMMDD format (e.g. 20150115) |
 | `full_date` | DATE | NO | — | Full date value (e.g. 2015-01-15) |
-| `year` | SMALLINT | NO | — | Calendar year (e.g. 2015) |
-| `month` | SMALLINT | NO | — | Calendar month number (1–12) |
-| `month_name` | VARCHAR(20) | NO | — | Full name of the month (e.g. January) |
+| `year` | SMALLINT | NO | — | Calendar year |
+| `month` | SMALLINT | NO | — | Calendar month (1–12) |
+| `month_name` | VARCHAR(20) | NO | — | Full month name (e.g. January) |
 | `month_name_short` | CHAR(3) | NO | — | Abbreviated month name (e.g. Jan) |
 | `day` | SMALLINT | NO | — | Day of the month (1–31) |
-| `day_of_week` | SMALLINT | NO | — | Day of the week number (1=Monday, 7=Sunday) |
-| `day_of_week_name` | VARCHAR(20) | NO | — | Full name of the day (e.g. Monday) |
+| `day_of_week` | SMALLINT | NO | — | Day of the week (1=Monday, 7=Sunday) |
+| `day_of_week_name` | VARCHAR(20) | NO | — | Full day name (e.g. Monday) |
 | `day_of_week_short` | CHAR(3) | NO | — | Abbreviated day name (e.g. Mon) |
-| `quarter` | SMALLINT | NO | — | Quarter of the year (1–4, each covering 3 months) |
-| `semester` | SMALLINT | NO | — | Semester of the year (1–2, each covering 6 months) |
-| `is_weekend` | SMALLINT | NO | — | 1 if the day is Saturday or Sunday, 0 otherwise |
-| `is_holiday` | SMALLINT | NO | — | 1 if the day is a US federal holiday, 0 otherwise |
+| `quarter` | SMALLINT | NO | — | Quarter of the year (1–4) |
+| `semester` | SMALLINT | NO | — | Semester of the year (1–2) |
+| `is_weekend` | SMALLINT | NO | — | 1 if Saturday or Sunday, 0 otherwise |
+| `is_holiday` | SMALLINT | NO | — | 1 if US federal holiday, 0 otherwise |
 | `created_at` | TIMESTAMP | NO | — | Timestamp when the record was created |
-| `updated_at` | TIMESTAMP | YES | — | Timestamp of the last update to the record |
+| `updated_at` | TIMESTAMP | YES | — | Timestamp of the last update |
 
 ---
 
 ## gold.fct_flights
 
-Fact table containing one row per flight operated in 2015. Central table of the star schema.
-
-**Grain:** One row = one flight
+*(Pending implementation)*
 
 | Column | Type | Nullable | PK/FK | Description |
 |--------|------|----------|-------|-------------|
-| `flight_id` | INT | NO | PK | Surrogate key — system-generated unique identifier for the flight |
+| `flight_id` | INT | NO | PK | Surrogate key |
 | `date_id` | INT | NO | FK → dim_date | Date the flight operated in YYYYMMDD format |
-| `airline_id` | INT | NO | FK → dim_airline | Identifier of the airline operating the flight |
+| `airline_id` | INT | NO | FK → dim_airline | Identifier of the operating airline |
 | `origin_airport_id` | INT | NO | FK → dim_airport | Identifier of the departure airport |
 | `destination_airport_id` | INT | NO | FK → dim_airport | Identifier of the arrival airport |
-| `cancellation_reason_id` | INT | YES | FK → dim_cancellation_reason | Identifier of the cancellation reason. NULL if flight was not cancelled |
-| `tail_number` | VARCHAR(10) | YES | — | Unique registration number of the aircraft (degenerate dimension) |
+| `cancellation_reason_id` | INT | YES | FK → dim_cancellation_reason | NULL if not cancelled |
+| `tail_number` | VARCHAR(10) | YES | — | Aircraft registration number (degenerate dimension) |
 | `flight_number` | SMALLINT | NO | — | Flight number assigned by the airline |
-| `scheduled_departure` | SMALLINT | YES | — | Scheduled departure time in HHMM format (e.g. 0600 = 6:00 AM) |
+| `scheduled_departure` | SMALLINT | YES | — | Scheduled departure time in HHMM format |
 | `departure_time` | SMALLINT | YES | — | Actual departure time in HHMM format |
-| `departure_delay` | SMALLINT | YES | — | Departure delay in minutes. Negative value means early departure |
+| `departure_delay` | SMALLINT | YES | — | Departure delay in minutes. Negative = early |
 | `scheduled_arrival` | SMALLINT | YES | — | Scheduled arrival time in HHMM format |
 | `arrival_time` | SMALLINT | YES | — | Actual arrival time in HHMM format |
-| `arrival_delay` | SMALLINT | YES | — | Arrival delay in minutes. Negative value means early arrival |
+| `arrival_delay` | SMALLINT | YES | — | Arrival delay in minutes. Negative = early |
 | `scheduled_time` | SMALLINT | YES | — | Scheduled flight duration in minutes |
-| `elapsed_time` | SMALLINT | YES | — | Actual total flight duration gate-to-gate in minutes |
-| `air_time` | SMALLINT | YES | — | Time in minutes the aircraft was airborne |
-| `taxi_out` | SMALLINT | YES | — | Time in minutes between gate departure and wheels off |
-| `taxi_in` | SMALLINT | YES | — | Time in minutes between wheels on and gate arrival |
+| `elapsed_time` | SMALLINT | YES | — | Actual gate-to-gate duration in minutes |
+| `air_time` | SMALLINT | YES | — | Time airborne in minutes |
+| `taxi_out` | SMALLINT | YES | — | Time between gate departure and wheels off |
+| `taxi_in` | SMALLINT | YES | — | Time between wheels on and gate arrival |
 | `wheels_off` | SMALLINT | YES | — | Time wheels left the ground in HHMM format |
 | `wheels_on` | SMALLINT | YES | — | Time wheels touched the ground in HHMM format |
-| `distance` | INT | YES | — | Distance between origin and destination airports in miles |
+| `distance` | INT | YES | — | Distance in miles between origin and destination |
 | `air_system_delay` | SMALLINT | YES | — | Minutes of delay attributed to the National Air System |
-| `security_delay` | SMALLINT | YES | — | Minutes of delay attributed to security issues |
+| `security_delay` | SMALLINT | YES | — | Minutes of delay attributed to security |
 | `airline_delay` | SMALLINT | YES | — | Minutes of delay attributed to the airline |
-| `late_aircraft_delay` | SMALLINT | YES | — | Minutes of delay attributed to a late arriving aircraft |
-| `weather_delay` | SMALLINT | YES | — | Minutes of delay attributed to weather conditions |
-| `is_cancelled` | SMALLINT | NO | — | 1 if the flight was cancelled, 0 otherwise |
-| `is_diverted` | SMALLINT | NO | — | 1 if the flight was diverted to a different airport, 0 otherwise |
+| `late_aircraft_delay` | SMALLINT | YES | — | Minutes of delay from a late arriving aircraft |
+| `weather_delay` | SMALLINT | YES | — | Minutes of delay attributed to weather |
+| `is_cancelled` | SMALLINT | NO | — | 1 if cancelled, 0 otherwise |
+| `is_diverted` | SMALLINT | NO | — | 1 if diverted, 0 otherwise |
 | `created_at` | TIMESTAMP | NO | — | Timestamp when the record was created |
-| `updated_at` | TIMESTAMP | YES | — | Timestamp of the last update to the record |
+| `updated_at` | TIMESTAMP | YES | — | Timestamp of the last update |
 
 **Business Rules:**
 

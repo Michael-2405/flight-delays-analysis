@@ -1,5 +1,5 @@
 -- Script Name: V4__create_flights_raw_table.sql
--- Description: Creates the flights raw table, this table get loaded
+-- Description: Creates the flights raw table, this table getS loaded
 --              from a CSV thru a python script. It saves the flights
 --              delayed, cancelled, diverted information.
 -- Author:      Michael Espinosa
