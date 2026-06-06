@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS gold.dim_airline(
   created_at    TIMESTAMP     NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMP     NULL,
 
-  CONSTRAINT pk_dim_airline PRIMARY KEY (airline_id)
+  CONSTRAINT pk_dim_airline PRIMARY KEY (airline_id),
+  CONSTRAINT uq_dim_airline_iata_code UNIQUE (iata_code)
 );
 
 COMMENT ON TABLE gold.dim_airline IS

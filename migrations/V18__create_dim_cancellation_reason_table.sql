@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS gold.dim_cancellation_reason(
   created_at                TIMESTAMP     NOT NULL DEFAULT NOW(),
   updated_at                TIMESTAMP     NULL,
 
-  CONSTRAINT pk_dim_cancellation_reason PRIMARY KEY (cancellation_reason_id)
+  CONSTRAINT pk_dim_cancellation_reason PRIMARY KEY (cancellation_reason_id),
+  CONSTRAINT uq_dim_cancellation_reason_cancellation_code UNIQUE (cancellation_code)
 );
 
 COMMENT ON TABLE gold.dim_cancellation_reason IS

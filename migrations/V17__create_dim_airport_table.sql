@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS gold.dim_airport(
   created_at    TIMESTAMP         NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMP         NULL,
 
-  CONSTRAINT pk_dim_airport PRIMARY KEY (airport_id)
+  CONSTRAINT pk_dim_airport PRIMARY KEY (airport_id),
+  CONSTRAINT uq_dim_airport_iata_code UNIQUE (iata_code)
 );
 
 COMMENT ON TABLE gold.dim_airport IS
