@@ -27,7 +27,7 @@ CSV Files (DOT / Kaggle)
   bronze schema       ← raw data, loaded via Python + COPY
         │
         ▼
-  silver schema       ← cleaned, typed, deduplicated (in progress)
+  silver schema       ← cleaned, standardized, derived columns added
         │
         ▼
   gold schema         ← star schema, ready for reporting (in progress)
@@ -42,10 +42,10 @@ CSV Files (DOT / Kaggle)
 
 | Layer | Status | Details |
 |-------|--------|---------|
-| Bronze | ✅ Complete | All 3 tables loaded — 5,819,415 rows |
-| ETL Logging | ✅ Complete | etl_log table + start/success/error functions |
-| Silver | 🔄 Pending | Tables not created, transformations pending EDA |
-| Gold | 🔄 Pending | Star schema designed, SPs pending |
+| Bronze | ✅ Complete | 3 tables — 5,819,415 rows loaded |
+| ETL Logging | ✅ Complete | Connected to all Silver SPs |
+| Silver | ✅ Complete | 3 tables — 5,819,415 rows, ETL logging active |
+| Gold | 🔄 In progress | Star schema designed, DDL pending |
 | Reporting | ⏳ Planned | Metabase / Power BI |
 
 ---
@@ -59,8 +59,6 @@ CSV Files (DOT / Kaggle)
 | Storage | PostgreSQL 16 |
 | Transformation | SQL, Stored Procedures |
 | Migrations | Flyway |
-| Orchestration | Prefect (planned) |
-| Reporting | Metabase / Power BI (planned) |
 | Containerization | Docker, Docker Compose |
 | CI/CD | GitHub Actions |
 | Version Control | Git, GitHub |
@@ -78,51 +76,48 @@ flight-delays-analysis/
 │   ├── data_catalog.md
 │   ├── data_dictionary.md
 │   ├── star_schema.md
-│   └── ingestion_architecture.md
+│   ├── ingestion_architecture.md
+│   └── eda_findings.md
 ├── migrations/                      ← Flyway versioned SQL migrations
 │   ├── V1__create_schemas.sql
-│   ├── V2__create_airlines_raw_table.sql
-│   ├── V3__create_airports_raw_table.sql
-│   ├── V4__create_flights_raw_table.sql
-│   ├── V5__create_etl_log_table.sql
-│   ├── V6__create_ufn_log_start_etl.sql
-│   ├── V7__create_usp_log_success_etl.sql
-│   ├── V8__create_usp_log_error_etl.sql
-│   └── V9–V24 (silver + gold — pending EDA)
+│   ├── V2–V4 (bronze tables)
+│   ├── V5–V8 (etl logging)
+│   ├── V9–V11 (silver tables)
+│   ├── V12–V14 (silver stored procedures)
+│   └── V15–V24 (gold — pending)
+├── sql/
+│   ├── eda/                         ← EDA queries by table
+│   │   ├── eda_airlines_raw.sql
+│   │   ├── eda_airports_raw.sql
+│   │   └── eda_flights_raw.sql
+│   └── analysis/                    ← Ad-hoc analysis queries
 ├── src/
 │   ├── config/
-│   │   ├── logging.py               ← loguru configuration
-│   │   └── settings.py              ← pydantic-settings env config
+│   │   ├── logging.py
+│   │   └── settings.py
 │   ├── database/
-│   │   ├── base_repository.py       ← abstract base with truncate()
-│   │   ├── bronze_repository.py     ← bronze schema base
+│   │   ├── base_repository.py
+│   │   ├── bronze_repository.py
 │   │   ├── airline_repository.py
 │   │   ├── airport_repository.py
-│   │   ├── flight_repository.py     ← COPY FROM STDIN bulk insert
-│   │   └── engine.py                ← SQLAlchemy engine
+│   │   ├── flight_repository.py
+│   │   └── engine.py
 │   ├── pipelines/
 │   │   ├── airlines_pipeline.py
 │   │   ├── airports_pipeline.py
-│   │   └── flights_pipeline.py      ← batch processing 100k rows
+│   │   └── flights_pipeline.py
 │   ├── readers/
-│   │   └── csv_reader.py            ← Polars CSV reader
+│   │   └── csv_reader.py
 │   ├── validators/
-│   │   ├── airlines_schema.py       ← Pandera schema
+│   │   ├── airlines_schema.py
 │   │   ├── airports_schema.py
 │   │   └── flights_schema.py
-│   └── main.py                      ← pipeline entry point
-├── sql/
-│   ├── bronze/
-│   ├── silver/
-│   ├── gold/
-│   ├── etl/
-│   └── seeds/
+│   └── main.py
 ├── tests/
 ├── .github/
-│   ├── workflows/
-│   │   └── ci.yml                   ← lint, migrate, test
+│   ├── workflows/ci.yml
 │   └── pull_request_template.md
-├── docker-compose.yml               ← Flyway service
+├── docker-compose.yml
 ├── .env.example
 ├── pyproject.toml
 └── README.md
@@ -159,11 +154,17 @@ uv sync
 # 5. Run Flyway migrations
 docker compose run --rm flyway migrate
 
-# 6. Run ingestion pipeline
+# 6. Run bronze ingestion pipeline
 uv run python src/main.py
+
+# 7. Load silver layer
+# Connect to flight_delays database and run:
+# CALL silver.usp_load_silver_airlines();
+# CALL silver.usp_load_silver_airport();
+# CALL silver.usp_load_silver_flight();
 ```
 
-### Expected Output
+### Expected Pipeline Output
 
 ```
 17:33:24 | INFO    | Loading airlines
@@ -188,6 +189,7 @@ uv run python src/main.py
 | [Data Dictionary](docs/data_dictionary.md) | Column-level description of all tables |
 | [Star Schema](docs/star_schema.md) | Dimensional model diagram |
 | [Ingestion Architecture](docs/ingestion_architecture.md) | Python pipeline design and patterns |
+| [EDA Findings](docs/eda_findings.md) | Bronze layer data quality analysis |
 
 ---
 
