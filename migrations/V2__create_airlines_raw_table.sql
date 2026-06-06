@@ -1,5 +1,5 @@
 -- Script Name: V2__create_airlines_raw_table.sql
--- Description: Creates the airlines raw table, this table get loaded
+-- Description: Creates the airlines raw table, this table getS loaded
 --              from a CSV thru a python script. It saves the IATA_CODE,
 --              AIRLINE information.
 -- Author:      Michael Espinosa

@@ -1,5 +1,5 @@
 -- Script Name: V3__create_airports_raw_table.sql
--- Description: Creates the airports raw table, this table get loaded
+-- Description: Creates the airports raw table, this table getS loaded
 --              from a CSV thru a python script. It saves the airports
 --              information.
 -- Author:      Michael Espinosa
