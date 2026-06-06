@@ -30,7 +30,7 @@ CSV Files (DOT / Kaggle)
   silver schema       ← cleaned, standardized, derived columns added
         │
         ▼
-  gold schema         ← star schema, ready for reporting (in progress)
+  gold schema         ← star schema, ready for reporting
         │
         ▼
   Metabase / Power BI ← dashboards and reports (planned)
@@ -43,9 +43,9 @@ CSV Files (DOT / Kaggle)
 | Layer | Status | Details |
 |-------|--------|---------|
 | Bronze | ✅ Complete | 3 tables — 5,819,415 rows loaded |
-| ETL Logging | ✅ Complete | Connected to all Silver SPs |
-| Silver | ✅ Complete | 3 tables — 5,819,415 rows, ETL logging active |
-| Gold | 🔄 In progress | Star schema designed, DDL pending |
+| ETL Logging | ✅ Complete | Connected to all Silver and Gold SPs |
+| Silver | ✅ Complete | 3 tables — 5,819,415 rows |
+| Gold | ✅ Complete | 5 tables — star schema operational |
 | Reporting | ⏳ Planned | Metabase / Power BI |
 
 ---
@@ -71,6 +71,10 @@ CSV Files (DOT / Kaggle)
 flight-delays-analysis/
 ├── data/
 │   └── raw/                         ← source CSV files (gitignored)
+│       ├── airlines.csv
+│       ├── airports.csv
+│       ├── flights.csv
+│       └── bts_airport_lookup/      ← DOT→IATA enrichment files (pending)
 ├── docs/
 │   ├── naming_conventions.md
 │   ├── data_catalog.md
@@ -78,19 +82,20 @@ flight-delays-analysis/
 │   ├── star_schema.md
 │   ├── ingestion_architecture.md
 │   └── eda_findings.md
-├── migrations/                      ← Flyway versioned SQL migrations
+├── migrations/
 │   ├── V1__create_schemas.sql
-│   ├── V2–V4 (bronze tables)
-│   ├── V5–V8 (etl logging)
-│   ├── V9–V11 (silver tables)
+│   ├── V2–V4   (bronze tables)
+│   ├── V5–V8   (etl logging)
+│   ├── V9–V11  (silver tables)
 │   ├── V12–V14 (silver stored procedures)
-│   └── V15–V24 (gold — pending)
+│   ├── V15–V19 (gold tables)
+│   └── V20–V24 (gold stored procedures)
 ├── sql/
-│   ├── eda/                         ← EDA queries by table
+│   ├── eda/
 │   │   ├── eda_airlines_raw.sql
 │   │   ├── eda_airports_raw.sql
 │   │   └── eda_flights_raw.sql
-│   └── analysis/                    ← Ad-hoc analysis queries
+│   └── analysis/
 ├── src/
 │   ├── config/
 │   │   ├── logging.py
@@ -158,10 +163,16 @@ docker compose run --rm flyway migrate
 uv run python src/main.py
 
 # 7. Load silver layer
-# Connect to flight_delays database and run:
-# CALL silver.usp_load_silver_airlines();
-# CALL silver.usp_load_silver_airport();
-# CALL silver.usp_load_silver_flight();
+CALL silver.usp_load_silver_airlines();
+CALL silver.usp_load_silver_airport();
+CALL silver.usp_load_silver_flight();
+
+# 8. Load gold layer (order matters)
+CALL gold.usp_load_gold_dim_date();
+CALL gold.usp_load_gold_airline();
+CALL gold.usp_load_gold_airport();
+CALL gold.usp_load_gold_cancellation_reason();
+CALL gold.usp_load_gold_fct_flights();
 ```
 
 ### Expected Pipeline Output
@@ -176,6 +187,25 @@ uv run python src/main.py
 17:33:24 | INFO    | Starting flights ingestion from flights.csv
 17:36:54 | SUCCESS | Flights loaded — 59 batches — 5,819,079 rows
 17:36:54 | SUCCESS | Pipeline completed — 5,819,415 total rows processed
+```
+
+---
+
+## Star Schema
+
+```
+                    dim_date
+                       │
+         dim_airline   │   dim_airport (origin)
+                 │     │     │
+                 ▼     ▼     ▼
+              ┌─────────────────┐
+              │   fct_flights   │
+              └─────────────────┘
+                 ▲         ▲
+                 │         │
+     dim_airport │         │ dim_cancellation_reason
+    (destination)
 ```
 
 ---
@@ -202,6 +232,17 @@ uv run python src/main.py
 | `feature/*` | New features and enhancements |
 | `fix/*` | Bug fixes |
 | `doc/*` | Documentation updates |
+
+---
+
+## Known Technical Debt
+
+| Issue | Impact | Priority |
+|-------|--------|----------|
+| 306 DOT numeric airport codes not in `dim_airport` | 486,165 flights with NULL airport IDs | Medium |
+| No UNIQUE constraint on `fct_flights` | Duplicate flights possible on re-run | Medium |
+| `etl_finish` uses NOW() instead of clock_timestamp() | Execution time not accurate | Low |
+| No unit or integration tests | Pipeline correctness not automated | Medium |
 
 ---
 
