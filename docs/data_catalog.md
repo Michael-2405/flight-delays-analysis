@@ -1,6 +1,6 @@
 # Data Catalog — Flight Delays Analysis
 
-**Version:** 1.1
+**Version:** 1.2
 **Last Updated:** 2026-06
 **Architecture:** Medallion (Bronze → Silver → Gold)
 **Database:** PostgreSQL 16
@@ -43,8 +43,8 @@ Source Files (CSV)
       │
       ▼
 ┌─────────────┐
-│   SILVER    │  Cleaned data — typed, deduplicated, standardized
-│ 🔄 Pending  │  Pending EDA results
+│   SILVER    │  Cleaned data — standardized, derived columns added
+│  ✅ Done    │  Truncate + full load, ETL logging connected
 └─────────────┘
       │
       ▼
@@ -60,7 +60,7 @@ Source Files (CSV)
 
 ┌─────────────┐
 │     ETL     │  Pipeline execution logs
-│  ✅ Done    │  etl_log + start/success/error functions
+│  ✅ Done    │  Connected to all Silver SPs
 └─────────────┘
 ```
 
@@ -71,23 +71,41 @@ Source Files (CSV)
 | Schema | Purpose | Status | Tables |
 |--------|---------|--------|--------|
 | `bronze` | Raw ingestion — data as-is from source files | ✅ Complete | `flights_raw`, `airlines_raw`, `airports_raw` |
-| `silver` | Cleaned and standardized data | 🔄 Pending EDA | `flights_clean`, `airlines_clean`, `airports_clean` |
-| `gold` | Star schema — dimensional model for analysis | 🔄 Pending Silver | `dim_airline`, `dim_airport`, `dim_date`, `dim_cancellation_reason`, `fct_flights` |
+| `silver` | Cleaned and standardized data | ✅ Complete | `flights_clean`, `airlines_clean`, `airports_clean` |
+| `gold` | Star schema — dimensional model for analysis | 🔄 Pending | `dim_airline`, `dim_airport`, `dim_date`, `dim_cancellation_reason`, `fct_flights` |
 | `etl` | Pipeline execution logs | ✅ Complete | `etl_log` |
 
 ---
 
-## Bronze Layer — Current State
+## Bronze Layer
 
-| Table | Rows Loaded | Load Strategy | Last Updated |
-|-------|-------------|---------------|--------------|
-| `bronze.airlines_raw` | 14 | Truncate + full load | 2026-06 |
-| `bronze.airports_raw` | 322 | Truncate + full load | 2026-06 |
-| `bronze.flights_raw` | 5,819,079 | Truncate + COPY (100k batches) | 2026-06 |
+| Table | Rows Loaded | Load Strategy | Notes |
+|-------|-------------|---------------|-------|
+| `bronze.airlines_raw` | 14 | Truncate + full load | Clean — no issues found in EDA |
+| `bronze.airports_raw` | 322 | Truncate + full load | 3 airports with NULL lat/lon (ECP, PBG, UST) |
+| `bronze.flights_raw` | 5,819,079 | Truncate + COPY (100k batches) | 486,165 flights with DOT numeric airport codes |
 
 ---
 
-## Gold Layer — Star Schema (Designed, Pending Implementation)
+## Silver Layer
+
+| Table | Rows | Source | Key Transformations |
+|-------|------|--------|---------------------|
+| `silver.airline_clean` | 14 | `bronze.airlines_raw` | Rename `airline` → `airline_name` |
+| `silver.airport_clean` | 322 | `bronze.airports_raw` | Rename `airport` → `airport_name` |
+| `silver.flight_clean` | 5,819,079 | `bronze.flights_raw` | Add `full_date DATE`, add `date_id INT (YYYYMMDD)` |
+
+### Silver Stored Procedures
+
+| Procedure | Description | Rows Written |
+|-----------|-------------|--------------|
+| `silver.usp_load_silver_airlines` | Truncate + load airlines | 14 |
+| `silver.usp_load_silver_airports` | Truncate + load airports | 322 |
+| `silver.usp_load_silver_flights` | Truncate + load flights with derived columns | 5,819,079 |
+
+---
+
+## Gold Layer — Star Schema (Pending)
 
 ```
                     dim_date
@@ -104,20 +122,13 @@ Source Files (CSV)
     (destination)│
 ```
 
-### Fact Table
-
-| Table | Description | Grain |
-|-------|-------------|-------|
-| `fct_flights` | One row per flight operated | One flight = one row |
-
-### Dimension Tables
-
-| Table | Description | Source | Rows |
-|-------|-------------|--------|------|
-| `dim_airline` | Airlines operating US domestic flights | `airlines_raw` | 14 |
-| `dim_airport` | US airports — role-playing dimension | `airports_raw` | 322 |
+| Table | Description | Source | Rows (expected) |
+|-------|-------------|--------|-----------------|
+| `dim_airline` | Airlines operating US domestic flights | `silver.airline_clean` | 14 |
+| `dim_airport` | US airports — role-playing dimension | `silver.airport_clean` | 322 |
 | `dim_date` | Calendar dimension for 2015 | Generated | 365 |
 | `dim_cancellation_reason` | Cancellation reason codes | Seed data | 4 |
+| `fct_flights` | One row per flight — grain of the model | `silver.flight_clean` | ~5.8M |
 
 ---
 
@@ -125,10 +136,47 @@ Source Files (CSV)
 
 | Object | Type | Description |
 |--------|------|-------------|
-| `etl.etl_log` | Table | Stores one record per pipeline execution |
-| `etl.ufn_log_start_etl` | Function | Inserts execution start record, returns `etl_log_id` |
-| `etl.usp_log_success_etl` | Procedure | Updates record with SUCCESS status and row counts |
-| `etl.usp_log_error_etl` | Procedure | Updates record with FAILED status and error details |
+| `etl.etl_log` | Table | One record per SP execution |
+| `etl.ufn_log_start_etl` | Function | Inserts start record, returns `etl_log_id` |
+| `etl.usp_log_success_etl` | Procedure | Updates record with SUCCESS and row counts |
+| `etl.usp_log_error_etl` | Procedure | Updates record with FAILED and error details |
+
+### Sample ETL Log Output
+
+| log_id | etl_name | status | rows_written | rows_read |
+|--------|----------|--------|--------------|-----------|
+| 5 | usp_load_silver_flight | SUCCESS | 5,819,079 | 5,819,079 |
+| 4 | usp_load_silver_airport | SUCCESS | 322 | 322 |
+| 3 | usp_load_silver_airline | SUCCESS | 14 | 14 |
+
+---
+
+## EDA Findings Summary
+
+Full findings in `docs/eda_findings.md` and queries in `sql/eda/`.
+
+| Table | Status | Key Findings |
+|-------|--------|-------------|
+| `airlines_raw` | ✅ Clean | No nulls, no duplicates, no whitespace |
+| `airports_raw` | ✅ Clean | 3 airports with NULL coordinates (ECP, PBG, UST) |
+| `flights_raw` | ⚠️ Issues found | See below |
+
+**flights_raw key findings:**
+- Business rules validated — 0 violations on cancellation logic
+- `departure_delay` nulls correlate with `cancelled = 1`
+- Delay ranges valid: dep [-82, 1988] avg=9.37 / arr [-87, 1971]
+- Natural key requires `destination_airport` (AA803 case)
+- ⚠️ 486,165 flights (8.4%) use DOT numeric airport codes not in `airports_raw`
+
+---
+
+## Known Technical Debt
+
+| Issue | Impact | Priority | Resolution |
+|-------|--------|----------|------------|
+| 306 DOT numeric airport codes not in `airports_raw` | 486,165 flights (8.4%) won't join to `dim_airport` | Medium | Enrich from BTS: https://www.transtats.bts.gov |
+| `etl_finish` same as `etl_start` | Execution time not tracked accurately | Low | Use `clock_timestamp()` in `usp_log_success_etl` |
+| No unit or integration tests | Pipeline correctness not automated | Medium | Add pytest tests for validators and pipelines |
 
 ---
 
@@ -141,22 +189,6 @@ Source Files (CSV)
 5. Are delays worse on weekends, holidays, or specific months?
 6. How does weather delay compare to airline delay across carriers?
 7. What is the cancellation rate by airline and month?
-
----
-
-## Pipeline Flow
-
-```
-1. Python reads CSV files from data/raw/ using Polars
-2. Pandera validates CSV schema before any insert
-3. Truncate bronze table
-4. Load raw data into bronze schema
-   - airlines + airports: SQLAlchemy executemany
-   - flights: PostgreSQL COPY FROM STDIN (100k rows/batch)
-5. ETL log records execution (pending connection to pipeline)
-6. Silver transformations (pending EDA)
-7. Gold dimensional model (pending Silver)
-```
 
 ---
 
@@ -177,3 +209,5 @@ Source Files (CSV)
 | **Surrogate Key** | System-generated integer ID replacing the natural business key |
 | **COPY FROM STDIN** | PostgreSQL bulk load command — 10-50x faster than INSERT for large datasets |
 | **Truncate + Full Load** | Load strategy that deletes all rows before reloading from source |
+| **date_id** | Integer representation of a date in YYYYMMDD format (e.g. 20150115) |
+| **GET DIAGNOSTICS** | PostgreSQL command to capture row count after DML operations |
