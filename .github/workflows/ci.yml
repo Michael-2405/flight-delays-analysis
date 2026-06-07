@@ -74,6 +74,12 @@ jobs:
             -locations="filesystem:/flyway/sql" \
             migrate
 
-      # ── 8. Tests ───────────────────────────────────────────
-      - name: Run tests
-        run: uv run pytest tests/ -v --co -q || echo "No tests found, skipping"
+      # ── 8. Unit tests ──────────────────────────────────────
+      - name: Run unit tests
+        run: uv run pytest tests/unit/ -v
+
+      # ── 9. Integration tests ───────────────────────────────
+      # Skipped in CI — require a fully loaded database
+      # Run locally with: uv run pytest tests/integration/ -v
+      - name: Run integration tests (skipped — no data in CI)
+        run: echo "Integration tests skipped in CI — run locally after loading data"
