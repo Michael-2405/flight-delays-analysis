@@ -46,7 +46,7 @@
 | **View (report)** | `vw_rpt_<name>` | `vw_rpt_delay_analysis` |
 | **View (dashboard)** | `vw_dash_<name>` | `vw_dash_flight_summary` |
 | **View (quality)** | `vw_dq_<check>` | `vw_dq_duplicate_flights` |
-| **Index** | `ix_<table>_<column>` | `ix_fct_flights_date_id` |
+| **Index** | `idx_<table>_<column>` | `idx_fct_flights_date_id` |
 | **PK Constraint** | `pk_<table>` | `pk_dim_airline`, `pk_fct_flights` |
 | **FK Constraint** | `fk_<table>_<referenced_table>` | `fk_fct_flights_dim_airline` |
 | **Unique Constraint** | `uq_<table>_<column>` | `uq_dim_airline_iata_code` |
