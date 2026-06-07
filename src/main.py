@@ -5,6 +5,8 @@ from loguru import logger
 from config.logging import configure_logging
 from config.settings import settings
 from pipelines.airlines_pipeline import AirlinePipeline
+from pipelines.airport_iata_pipeline import AirportIataPipeline
+from pipelines.airport_id_pipeline import AirportIdPipeline
 from pipelines.airports_pipeline import AirportPipeline
 from pipelines.flights_pipeline import FlightPipeline
 
@@ -19,6 +21,12 @@ def main() -> None:
     logger.info(f"Cumulative rows processed: {total:,}")
 
     total += AirportPipeline().run(file_path=raw_path / "airports.csv")
+    logger.info(f"Cumulative rows processed: {total:,}")
+
+    total += AirportIdPipeline().run(raw_path / "L_AIRPORT_ID.csv")
+    logger.info(f"Cumulative rows processed: {total:,}")
+
+    total += AirportIataPipeline().run(raw_path / "L_AIRPORT.csv")
     logger.info(f"Cumulative rows processed: {total:,}")
 
     total += FlightPipeline().run(file_path=raw_path / "flights.csv")
