@@ -1,12 +1,16 @@
 -- Script Name: V24__create_usp_load_gold_fct_flights.sql
 -- Description: Creates the stored procedure that loads gold.fct_flights
 --              from silver.flight_clean. Joins to all gold dimensions
---              to resolve surrogate keys. Truncate + full load strategy.
+--              to resolve surrogate keys. Incremental INSERT strategy —
+--              skips duplicates using ON CONFLICT DO NOTHING on natural key
+--              (date_id, airline_id, flight_number, origin_airport_id,
+--              destination_airport_id).
 --              Logs execution start, success and errors to etl.etl_log.
 -- Author:      Michael Espinosa
 -- Date:        2026-06-06
 -- Change Log:
 --   2026-06-06 | Michael Espinosa | Initial version
+--   2026-06-06 | Michael Espinosa | Add ON CONFLICT DO NOTHING to prevent duplicates
 
 CREATE OR REPLACE PROCEDURE gold.usp_load_gold_fct_flights()
 LANGUAGE plpgsql
@@ -89,7 +93,9 @@ BEGIN
     LEFT JOIN gold.dim_airport dest
         ON f.destination_airport = dest.iata_code
     LEFT JOIN gold.dim_cancellation_reason cr
-        ON f.cancellation_reason = cr.cancellation_code;
+        ON f.cancellation_reason = cr.cancellation_code
+    ON CONFLICT (date_id, airline_id, flight_number, origin_airport_id, destination_airport_id)
+    DO NOTHING;
 
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     RAISE NOTICE '[SUCCESS] Rows written: %', v_rows;
