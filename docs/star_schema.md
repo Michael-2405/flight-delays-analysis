@@ -37,9 +37,9 @@ flowchart TB
     🔑 flight_id (PK)
     🔗 date_id (FK)
     🔗 airline_id (FK)
-    🔗 origin_airport_id (FK)
-    🔗 destination_airport_id (FK)
-    🔗 cancellation_reason_id (FK)
+    🔗 origin_airport_id (FK, nullable)
+    🔗 destination_airport_id (FK, nullable)
+    🔗 cancellation_reason_id (FK, nullable)
     ────────────────
     tail_number
     flight_number
@@ -63,5 +63,7 @@ flowchart TB
 ## Notes
 
 - `dim_airport` is a **role-playing dimension** — connects to `fct_flights` twice: as origin and as destination airport.
+- `origin_airport_id` and `destination_airport_id` are **nullable** — resolved via airport enrichment (V27, V28). All 5,819,079 rows have non-null values.
 - `cancellation_reason_id` is **nullable** — only populated when `is_cancelled = 1`.
 - `date_id` uses `YYYYMMDD` integer format (e.g. `20150115`).
+- `fct_flights` has a `UNIQUE NULLS NOT DISTINCT` constraint on the natural key: `date_id + airline_id + flight_number + origin_airport_id + destination_airport_id`.
