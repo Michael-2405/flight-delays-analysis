@@ -18,9 +18,10 @@ dependencies = [
 dev = ["ruff", "pytest"]
 
 [tool.pytest.ini_options]
-
 addopts = "-v"
-testpaths = ["tests"]
+testpaths = ["tests/unit", "tests/integration"]
+pythonpath = ["src"]
+markers = ["integration: marks tests that require a fully loaded database"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

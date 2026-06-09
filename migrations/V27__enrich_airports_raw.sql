@@ -1,14 +1,17 @@
+-- =============================================================
 -- Script Name: V27__enrich_airports_raw.sql
--- Description: Enriches bronze.airports_raw with 306 missing airports
---              identified during EDA. Crosses L_AIRPORT_ID.csv (DOT numeric
---              codes) with L_AIRPORT.csv (IATA codes) by description to
---              resolve DOT→IATA mapping. Inserts only airports not already
---              present in airports_raw.
+-- Description: Enriches bronze.airports_raw with missing airports
+--              identified during EDA. Crosses airport_id_raw (DOT
+--              codes) with airport_iata_raw (IATA codes) by description
+--              match. Inserts only airports not already present.
+--              Parses city, state and airport_name from description
+--              format: "City, ST: Airport Name".
+-- Schema:      bronze
 -- Author:      Michael Espinosa
 -- Date:        2026-06-06
 -- Change Log:
 --   2026-06-06 | Michael Espinosa | Initial version
-
+-- =============================================================
 
 INSERT INTO bronze.airports_raw (
     iata_code, airport, city, state, country, source_file, loaded_at

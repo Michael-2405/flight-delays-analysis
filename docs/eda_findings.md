@@ -1,6 +1,6 @@
 # EDA Findings — Bronze Layer
 
-**Version:** 1.2
+**Version:** 1.3
 **Date:** 2026-06
 **Author:** Michael Espinosa
 
@@ -121,10 +121,18 @@ Updated `usp_load_gold_fct_flights` with `ON CONFLICT DO NOTHING`.
 
 ---
 
-## Remaining Technical Debt
+## ✅ Resolved — Indexes on fct_flights
 
-| Issue | Priority |
-|-------|----------|
-| No indexes on `fct_flights` | High — needed before reporting |
-| No unit or integration tests | Medium |
-| `etl_finish` clock accuracy | Low |
+**Status:** RESOLVED in v0.5.0
+
+Added 7 BTREE indexes on `gold.fct_flights` covering the most frequently
+filtered and grouped columns for reporting queries.
+
+---
+
+## ✅ Resolved — Unit and Integration Tests
+
+**Status:** RESOLVED in v0.5.0
+
+Added 22 unit tests for Pandera validators and 33 integration tests
+validating Bronze → Silver → Gold pipeline correctness.

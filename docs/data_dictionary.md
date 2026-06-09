@@ -1,6 +1,6 @@
 # Data Dictionary — Flight Delays Analysis
 
-**Version:** 1.1
+**Version:** 1.2
 **Last Updated:** 2026-06
 **Database:** PostgreSQL 16
 
@@ -21,7 +21,7 @@ Raw airline data loaded directly from `airlines.csv`.
 
 ## bronze.airports_raw
 
-Raw airport data loaded directly from `airports.csv`.
+Raw airport data loaded directly from `airports.csv` and enriched via V27.
 
 | Column | Type | Nullable | Description |
 |--------|------|----------|-------------|
@@ -79,6 +79,32 @@ Raw flight data loaded directly from `flights.csv`. One row per flight.
 
 ---
 
+## bronze.airport_id_raw
+
+BTS DOT numeric airport code lookup table. Loaded from `L_AIRPORT_ID.csv`.
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `code` | INT | NO | DOT numeric airport identifier |
+| `description` | VARCHAR(300) | NO | Airport description in format "City, ST: Airport Name" |
+| `source_file` | VARCHAR(100) | NO | Name of the source file this record was loaded from |
+| `loaded_at` | TIMESTAMP | NO | Timestamp when the record was loaded into bronze |
+
+---
+
+## bronze.airport_iata_raw
+
+BTS IATA airport code lookup table. Loaded from `L_AIRPORT.csv`.
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `code` | VARCHAR(10) | NO | IATA or FAA airport code |
+| `description` | VARCHAR(300) | NO | Airport description in format "City, ST: Airport Name" |
+| `source_file` | VARCHAR(100) | NO | Name of the source file this record was loaded from |
+| `loaded_at` | TIMESTAMP | NO | Timestamp when the record was loaded into bronze |
+
+---
+
 ## silver.airline_clean
 
 Cleaned airline data loaded from `bronze.airlines_raw`.
@@ -113,6 +139,7 @@ Cleaned airport data loaded from `bronze.airports_raw`.
 ## silver.flight_clean
 
 Cleaned flight data loaded from `bronze.flights_raw`. One row per flight.
+DOT numeric airport codes translated to IATA via `etl.airport_dot_iata_map`.
 
 | Column | Type | Nullable | Description |
 |--------|------|----------|-------------|
@@ -125,8 +152,8 @@ Cleaned flight data loaded from `bronze.flights_raw`. One row per flight.
 | `airline` | VARCHAR(10) | YES | IATA 2-letter code of the operating airline |
 | `flight_number` | SMALLINT | YES | Flight number assigned by the airline |
 | `tail_number` | VARCHAR(10) | YES | Unique registration number of the aircraft. 14,721 NULLs |
-| `origin_airport` | VARCHAR(10) | YES | IATA code or DOT numeric code of the departure airport |
-| `destination_airport` | VARCHAR(10) | YES | IATA code or DOT numeric code of the arrival airport |
+| `origin_airport` | VARCHAR(10) | YES | IATA code of the departure airport (DOT codes translated) |
+| `destination_airport` | VARCHAR(10) | YES | IATA code of the arrival airport (DOT codes translated) |
 | `scheduled_departure` | SMALLINT | YES | Scheduled departure time in HHMM format |
 | `departure_time` | SMALLINT | YES | Actual departure time in HHMM format |
 | `departure_delay` | SMALLINT | YES | Departure delay in minutes. Negative = early. NULL when cancelled |
@@ -175,14 +202,26 @@ Pipeline execution log. One row per stored procedure execution.
 
 ---
 
+## etl.airport_dot_iata_map
+
+Reference table mapping DOT numeric airport codes to IATA codes.
+Built by crossing `airport_id_raw` with `airport_iata_raw` on description match.
+
+| Column | Type | Nullable | PK | Description |
+|--------|------|----------|----|-------------|
+| `dot_code` | INT | NO | PK | DOT numeric airport identifier |
+| `iata_code` | VARCHAR(10) | NO | — | Corresponding IATA airport code |
+
+---
+
 ## gold.dim_airline
 
-*(Pending implementation)*
+Airline dimension. Loaded from `silver.airline_clean` via UPSERT (SCD Tipo 1).
 
 | Column | Type | Nullable | PK/FK | Description |
 |--------|------|----------|-------|-------------|
-| `airline_id` | INT | NO | PK | Surrogate key |
-| `iata_code` | VARCHAR(10) | NO | — | IATA 2-letter airline code |
+| `airline_id` | INT | NO | PK | Surrogate key — auto-generated identity |
+| `iata_code` | VARCHAR(10) | NO | UNIQUE | IATA 2-letter airline code |
 | `airline_name` | VARCHAR(100) | NO | — | Full name of the airline |
 | `created_at` | TIMESTAMP | NO | — | Timestamp when the record was created |
 | `updated_at` | TIMESTAMP | YES | — | Timestamp of the last update |
@@ -191,19 +230,20 @@ Pipeline execution log. One row per stored procedure execution.
 
 ## gold.dim_airport
 
-*(Pending implementation)*
+Airport dimension. Role-playing — used as both origin and destination in `fct_flights`.
+Loaded from `silver.airport_clean` via UPSERT (SCD Tipo 1).
 
 | Column | Type | Nullable | PK/FK | Description |
 |--------|------|----------|-------|-------------|
-| `airport_id` | INT | NO | PK | Surrogate key |
-| `iata_code` | VARCHAR(10) | NO | — | IATA 3-letter airport code |
+| `airport_id` | INT | NO | PK | Surrogate key — auto-generated identity |
+| `iata_code` | VARCHAR(10) | NO | UNIQUE | IATA 3-letter airport code |
 | `airport_name` | VARCHAR(200) | NO | — | Full name of the airport |
 | `city` | VARCHAR(100) | YES | — | City where the airport is located |
 | `state` | VARCHAR(100) | YES | — | US state where the airport is located |
 | `country` | VARCHAR(100) | YES | — | Country where the airport is located |
 | `latitude` | DECIMAL(10,6) | YES | — | Geographic latitude coordinate |
 | `longitude` | DECIMAL(10,6) | YES | — | Geographic longitude coordinate |
-| `timezone` | TEXT | YES | — | Timezone (e.g. America/New_York) |
+| `timezone` | TEXT | YES | — | IANA timezone identifier (e.g. America/New_York) |
 | `created_at` | TIMESTAMP | NO | — | Timestamp when the record was created |
 | `updated_at` | TIMESTAMP | YES | — | Timestamp of the last update |
 
@@ -211,12 +251,12 @@ Pipeline execution log. One row per stored procedure execution.
 
 ## gold.dim_cancellation_reason
 
-*(Pending implementation)*
+Static cancellation reason dimension. Loaded via seed data UPSERT.
 
 | Column | Type | Nullable | PK/FK | Description |
 |--------|------|----------|-------|-------------|
-| `cancellation_reason_id` | INT | NO | PK | Surrogate key |
-| `cancellation_code` | CHAR(1) | NO | — | Single-letter code: A, B, C, or D |
+| `cancellation_reason_id` | INT | NO | PK | Surrogate key — auto-generated identity |
+| `cancellation_code` | CHAR(1) | NO | UNIQUE | Single-letter code: A, B, C, or D |
 | `code_description` | VARCHAR(50) | NO | — | Full description of the cancellation reason |
 | `created_at` | TIMESTAMP | NO | — | Timestamp when the record was created |
 | `updated_at` | TIMESTAMP | YES | — | Timestamp of the last update |
@@ -234,7 +274,8 @@ Pipeline execution log. One row per stored procedure execution.
 
 ## gold.dim_date
 
-*(Pending implementation)*
+Calendar dimension. Pre-populated via `generate_series` from 2014-01-01 to 2016-12-31.
+Idempotent INSERT — safe to re-run.
 
 | Column | Type | Nullable | PK/FK | Description |
 |--------|------|----------|-------|-------------|
@@ -259,15 +300,16 @@ Pipeline execution log. One row per stored procedure execution.
 
 ## gold.fct_flights
 
-*(Pending implementation)*
+Central fact table. One row per US domestic flight operated in 2015.
+Natural key: `date_id + airline_id + flight_number + origin_airport_id + destination_airport_id`.
 
 | Column | Type | Nullable | PK/FK | Description |
 |--------|------|----------|-------|-------------|
-| `flight_id` | INT | NO | PK | Surrogate key |
+| `flight_id` | INT | NO | PK | Surrogate key — auto-generated identity |
 | `date_id` | INT | NO | FK → dim_date | Date the flight operated in YYYYMMDD format |
-| `airline_id` | INT | NO | FK → dim_airline | Identifier of the operating airline |
-| `origin_airport_id` | INT | NO | FK → dim_airport | Identifier of the departure airport |
-| `destination_airport_id` | INT | NO | FK → dim_airport | Identifier of the arrival airport |
+| `airline_id` | INT | NO | FK → dim_airline | Surrogate key of the operating airline |
+| `origin_airport_id` | INT | YES | FK → dim_airport | Surrogate key of the departure airport. Nullable |
+| `destination_airport_id` | INT | YES | FK → dim_airport | Surrogate key of the arrival airport. Nullable |
 | `cancellation_reason_id` | INT | YES | FK → dim_cancellation_reason | NULL if not cancelled |
 | `tail_number` | VARCHAR(10) | YES | — | Aircraft registration number (degenerate dimension) |
 | `flight_number` | SMALLINT | NO | — | Flight number assigned by the airline |
@@ -280,8 +322,8 @@ Pipeline execution log. One row per stored procedure execution.
 | `scheduled_time` | SMALLINT | YES | — | Scheduled flight duration in minutes |
 | `elapsed_time` | SMALLINT | YES | — | Actual gate-to-gate duration in minutes |
 | `air_time` | SMALLINT | YES | — | Time airborne in minutes |
-| `taxi_out` | SMALLINT | YES | — | Time between gate departure and wheels off |
-| `taxi_in` | SMALLINT | YES | — | Time between wheels on and gate arrival |
+| `taxi_out` | SMALLINT | YES | — | Time between gate departure and wheels off in minutes |
+| `taxi_in` | SMALLINT | YES | — | Time between wheels on and gate arrival in minutes |
 | `wheels_off` | SMALLINT | YES | — | Time wheels left the ground in HHMM format |
 | `wheels_on` | SMALLINT | YES | — | Time wheels touched the ground in HHMM format |
 | `distance` | INT | YES | — | Distance in miles between origin and destination |
@@ -291,12 +333,26 @@ Pipeline execution log. One row per stored procedure execution.
 | `late_aircraft_delay` | SMALLINT | YES | — | Minutes of delay from a late arriving aircraft |
 | `weather_delay` | SMALLINT | YES | — | Minutes of delay attributed to weather |
 | `is_cancelled` | SMALLINT | NO | — | 1 if cancelled, 0 otherwise |
-| `is_diverted` | SMALLINT | NO | — | 1 if diverted, 0 otherwise |
+| `is_diverted` | SMALLINT | NO | — | 1 if diverted to a different airport, 0 otherwise |
 | `created_at` | TIMESTAMP | NO | — | Timestamp when the record was created |
 | `updated_at` | TIMESTAMP | YES | — | Timestamp of the last update |
 
-**Business Rules:**
+**Constraints:**
 
-| Rule | Description |
-|------|-------------|
-| `ck_fct_flights_cancellation` | If `is_cancelled = 1` then `cancellation_reason_id` must NOT be NULL. If `is_cancelled = 0` then `cancellation_reason_id` must be NULL |
+| Constraint | Type | Description |
+|------------|------|-------------|
+| `pk_fct_flights` | PRIMARY KEY | `flight_id` |
+| `uq_fct_flights_natural_key` | UNIQUE NULLS NOT DISTINCT | `date_id, airline_id, flight_number, origin_airport_id, destination_airport_id` |
+| `ck_fct_flights_cancellation` | CHECK | `is_cancelled = 1` requires `cancellation_reason_id IS NOT NULL`. `is_cancelled = 0` requires `cancellation_reason_id IS NULL` |
+
+**Indexes:**
+
+| Index | Column |
+|-------|--------|
+| `idx_fct_flights_date_id` | `date_id` |
+| `idx_fct_flights_airline_id` | `airline_id` |
+| `idx_fct_flights_origin_airport_id` | `origin_airport_id` |
+| `idx_fct_flights_destination_airport_id` | `destination_airport_id` |
+| `idx_fct_flights_is_cancelled` | `is_cancelled` |
+| `idx_fct_flights_departure_delay` | `departure_delay` |
+| `idx_fct_flights_arrival_delay` | `arrival_delay` |

@@ -10,20 +10,41 @@ from database.engine import engine
 
 
 class FlightRepository(BronzeRepository):
+    """Repository for bronze.flights_raw.
+
+    Uses PostgreSQL COPY FROM STDIN for bulk loading instead of
+    executemany, which provides 10-50x better performance for
+    the 5.8M row flights dataset.
+    """
+
     @property
     def table_name(self) -> str:
         return "flights_raw"
 
     def insert_batch_copy(self, rows: list[dict], source_file: str) -> None:
+        """Bulk insert a batch of flight rows using PostgreSQL COPY FROM STDIN.
+
+        Dynamically reads column names from the table schema, excluding
+        loaded_at (handled by DEFAULT NOW()). Adds source_file to each row
+        before writing.
+
+        Args:
+            rows: List of dicts with lowercase keys matching the table columns.
+                Each dict should contain all flight fields from flights.csv.
+            source_file: Name of the source CSV file (e.g. "flights.csv").
+                Written to the source_file column for traceability.
+
+        Raises:
+            psycopg.Error: If the COPY operation fails.
+        """
         if not rows:
             return
 
         inspector = inspect(engine)
-
         columns = [
             col["name"]
             for col in inspector.get_columns(self.table_name, schema=self.schema_name)
-            if col["name"] not in ("loaded_at")
+            if col["name"] not in ("loaded_at",)
         ]
 
         copy_sql = f"""

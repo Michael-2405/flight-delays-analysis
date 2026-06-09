@@ -33,7 +33,7 @@ CSV Files (DOT / Kaggle) + BTS Lookup Tables
   gold schema         ← star schema, ready for reporting
         │
         ▼
-  Metabase            ← dashboards and reports (planned)
+  Apache Superset     ← dashboards and reports (planned)
 ```
 
 ---
@@ -47,7 +47,9 @@ CSV Files (DOT / Kaggle) + BTS Lookup Tables
 | Silver | ✅ Complete | 3 tables — DOT→IATA translation applied |
 | Gold | ✅ Complete | 5 tables — 0 NULL airport IDs, no duplicates |
 | Airport Enrichment | ✅ Complete | 486,165 flights resolved (100%) |
-| Reporting | ⏳ Planned | Metabase |
+| Indexes | ✅ Complete | 7 BTREE indexes on fct_flights |
+| Tests | ✅ Complete | 22 unit + 33 integration tests |
+| Reporting | ⏳ Planned | Apache Superset |
 
 ---
 
@@ -62,6 +64,7 @@ CSV Files (DOT / Kaggle) + BTS Lookup Tables
 | Migrations | Flyway |
 | Containerization | Docker, Docker Compose |
 | CI/CD | GitHub Actions |
+| Reporting | Apache Superset (planned) |
 | Version Control | Git, GitHub |
 
 ---
@@ -83,7 +86,8 @@ flight-delays-analysis/
 │   ├── data_dictionary.md
 │   ├── star_schema.md
 │   ├── ingestion_architecture.md
-│   └── eda_findings.md
+│   ├── eda_findings.md
+│   └── eda_guide.md
 ├── migrations/
 │   ├── V1–V4   (schemas + bronze tables)
 │   ├── V5–V8   (etl logging)
@@ -94,7 +98,8 @@ flight-delays-analysis/
 │   ├── V25–V26 (BTS lookup tables)
 │   ├── V27     (airports_raw enrichment)
 │   ├── V28     (etl.airport_dot_iata_map)
-│   └── V29     (fct_flights UNIQUE constraint)
+│   ├── V29     (fct_flights UNIQUE constraint)
+│   └── V30     (fct_flights indexes)
 ├── sql/
 │   ├── eda/
 │   └── analysis/
@@ -111,6 +116,8 @@ flight-delays-analysis/
 │   ├── validators/
 │   └── main.py
 ├── tests/
+│   ├── unit/
+│   └── integration/
 ├── .github/
 ├── docker-compose.yml
 ├── .env.example
@@ -153,17 +160,27 @@ docker compose run --rm flyway migrate
 # 6. Run bronze ingestion pipeline
 uv run python src/main.py
 
-# 7. Load silver layer
-CALL silver.usp_load_silver_airlines();
+# 7. Load silver layer (in order)
+CALL silver.usp_load_silver_airline();
 CALL silver.usp_load_silver_airport();
 CALL silver.usp_load_silver_flight();
 
-# 8. Load gold layer
+# 8. Load gold layer (in order)
 CALL gold.usp_load_gold_dim_date();
-CALL gold.usp_load_gold_airline();
-CALL gold.usp_load_gold_airport();
-CALL gold.usp_load_gold_cancellation_reason();
+CALL gold.usp_load_gold_dim_airline();
+CALL gold.usp_load_gold_dim_airport();
+CALL gold.usp_load_gold_dim_cancellation_reason();
 CALL gold.usp_load_gold_fct_flights();
+```
+
+### Running Tests
+
+```bash
+# Unit tests
+uv run pytest tests/unit/ -v
+
+# Integration tests (requires loaded database)
+uv run pytest tests/integration/ -v
 ```
 
 ---
@@ -192,6 +209,7 @@ CALL gold.usp_load_gold_fct_flights();
 `flights_raw` uses DOT numeric airport codes (e.g. 10423) that are not standard IATA codes. This affected 486,165 flights (8.4%) with NULL airport IDs in Gold.
 
 **Resolution:**
+
 - Downloaded BTS lookup tables: `L_AIRPORT_ID.csv` (DOT codes) and `L_AIRPORT.csv` (IATA codes)
 - Built `etl.airport_dot_iata_map` — 6,778 DOT→IATA mappings by description match
 - 302 of 306 codes resolved automatically
@@ -201,26 +219,17 @@ CALL gold.usp_load_gold_fct_flights();
 
 ---
 
-## Known Technical Debt
-
-| Issue | Impact | Priority |
-|-------|--------|----------|
-| No indexes on fct_flights | Slow queries on large dataset | High |
-| No unit or integration tests | Pipeline correctness not automated | Medium |
-| `etl_finish` uses NOW() instead of clock_timestamp() | Execution time not accurate | Low |
-
----
-
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [Naming Conventions](docs/naming_conventions.md) | Rules for naming all database objects |
+| [Naming Conventions](docs/naming_conventions.md) | Rules for naming database objects and Python code |
 | [Data Catalog](docs/data_catalog.md) | Project overview, sources, architecture and glossary |
 | [Data Dictionary](docs/data_dictionary.md) | Column-level description of all tables |
 | [Star Schema](docs/star_schema.md) | Dimensional model diagram |
 | [Ingestion Architecture](docs/ingestion_architecture.md) | Python pipeline design and patterns |
-| [EDA Findings](docs/eda_findings.md) | Bronze layer data quality analysis |
+| [EDA Findings](docs/eda_findings.md) | Bronze layer data quality analysis and decisions |
+| [EDA Guide](docs/eda_guide.md) | General EDA process guide and checklist |
 
 ---
 

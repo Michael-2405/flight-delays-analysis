@@ -9,7 +9,21 @@ from validators.airport_id_schema import airport_id_schema
 
 
 class AirportIdPipeline:
+    """Pipeline for loading L_AIRPORT_ID.csv into bronze.airport_id_raw.
+
+    Source file uses latin1 encoding (BTS government file).
+    Truncate + full load strategy.
+    """
+
     def run(self, file_path: Path) -> int:
+        """Read, validate and load BTS DOT airport ID data into bronze.
+
+        Args:
+            file_path: Path to L_AIRPORT_ID.csv.
+
+        Returns:
+            Number of rows loaded.
+        """
         logger.info("Loading L_AIRPORT_ID")
         df = CsvReader.read(file_path, encoding="latin1")
         airport_id_schema.validate(df)

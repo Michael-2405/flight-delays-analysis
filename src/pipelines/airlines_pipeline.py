@@ -9,7 +9,20 @@ from validators.airlines_schema import airlines_schema
 
 
 class AirlinePipeline:
+    """Pipeline for loading airlines.csv into bronze.airlines_raw.
+
+    Truncate + full load strategy.
+    """
+
     def run(self, file_path: Path) -> int:
+        """Read, validate and load airlines data into bronze.
+
+        Args:
+            file_path: Path to airlines.csv.
+
+        Returns:
+            Number of rows loaded.
+        """
         logger.info("Loading airlines")
         df = CsvReader.read(file_path)
         airlines_schema.validate(df)

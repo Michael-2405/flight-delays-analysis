@@ -1,6 +1,6 @@
 # Data Catalog — Flight Delays Analysis
 
-**Version:** 1.4
+**Version:** 1.5
 **Last Updated:** 2026-06
 **Architecture:** Medallion (Bronze → Silver → Gold)
 **Database:** PostgreSQL 16
@@ -21,7 +21,7 @@
 
 ## Architecture
 
-```
+```text
 Source Files (CSV + BTS)
       │
       ▼
@@ -44,7 +44,7 @@ Source Files (CSV + BTS)
       │
       ▼
 ┌─────────────┐
-│   REPORTS   │  Metabase (planned)
+│   REPORTS   │  Apache Superset (planned)
 │  ⏳ Planned │
 └─────────────┘
 
@@ -61,7 +61,7 @@ Source Files (CSV + BTS)
 | Schema | Purpose | Status | Tables |
 |--------|---------|--------|--------|
 | `bronze` | Raw ingestion | ✅ Complete | `flights_raw`, `airlines_raw`, `airports_raw`, `airport_id_raw`, `airport_iata_raw` |
-| `silver` | Cleaned data | ✅ Complete | `flights_clean`, `airlines_clean`, `airports_clean` |
+| `silver` | Cleaned data | ✅ Complete | `flight_clean`, `airline_clean`, `airport_clean` |
 | `gold` | Star schema | ✅ Complete | `dim_airline`, `dim_airport`, `dim_date`, `dim_cancellation_reason`, `fct_flights` |
 | `etl` | Infrastructure | ✅ Complete | `etl_log`, `airport_dot_iata_map` |
 
@@ -83,7 +83,7 @@ Source Files (CSV + BTS)
 
 | Table | Rows | Description |
 |-------|------|-------------|
-| `etl.airport_dot_iata_map` | 6,778 | DOT→IATA mapping. 302 automatic + 4 manual |
+| `etl.airport_dot_iata_map` | 6,778 | DOT→IATA mapping — 302 automatic + 4 manual |
 
 ### Manual Mappings (civil/military shared airports)
 
@@ -102,7 +102,7 @@ Source Files (CSV + BTS)
 |-------|------|---------------------|
 | `silver.airline_clean` | 14 | Rename `airline` → `airline_name` |
 | `silver.airport_clean` | 326 | Rename `airport` → `airport_name` |
-| `silver.flight_clean` | 5,819,079 | Add `full_date`, `date_id`, DOT→IATA translation |
+| `silver.flight_clean` | 5,819,079 | Add `full_date`, `date_id`, DOT→IATA translation via `etl.airport_dot_iata_map` |
 
 ---
 
@@ -111,10 +111,20 @@ Source Files (CSV + BTS)
 | Table | Rows | Load Strategy | Notes |
 |-------|------|---------------|-------|
 | `gold.dim_date` | 1,096 | Idempotent INSERT | 2014-01-01 → 2016-12-31 |
-| `gold.dim_airline` | 14 | UPSERT SCD1 | |
-| `gold.dim_airport` | 326 | UPSERT SCD1 | Includes enriched airports |
-| `gold.dim_cancellation_reason` | 4 | UPSERT seed | A, B, C, D |
-| `gold.fct_flights` | 5,819,079 | Incremental + ON CONFLICT | 0 NULL airport IDs |
+| `gold.dim_airline` | 14 | UPSERT SCD1 | UNIQUE on `iata_code` |
+| `gold.dim_airport` | 326 | UPSERT SCD1 | UNIQUE on `iata_code` |
+| `gold.dim_cancellation_reason` | 4 | UPSERT seed | A=Carrier, B=Weather, C=NAS, D=Security |
+| `gold.fct_flights` | 5,819,079 | Incremental + ON CONFLICT DO NOTHING | 0 NULL airport IDs |
+
+### Gold Stored Procedures
+
+| Procedure | Source | Strategy | Approx. Duration |
+|-----------|--------|----------|-----------------|
+| `usp_load_gold_dim_date` | `generate_series` | Idempotent INSERT | <1s |
+| `usp_load_gold_dim_airline` | `silver.airline_clean` | UPSERT SCD1 | <1s |
+| `usp_load_gold_dim_airport` | `silver.airport_clean` | UPSERT SCD1 | <1s |
+| `usp_load_gold_dim_cancellation_reason` | Seed data | UPSERT | <1s |
+| `usp_load_gold_fct_flights` | `silver.flight_clean` | Incremental INSERT | ~13 min |
 
 ### fct_flights Quality Metrics
 
@@ -123,7 +133,8 @@ Source Files (CSV + BTS)
 | Total rows | 5,819,079 |
 | NULL origin_airport_id | 0 (0%) |
 | NULL destination_airport_id | 0 (0%) |
-| Duplicate protection | UNIQUE constraint on natural key |
+| Duplicate protection | UNIQUE NULLS NOT DISTINCT on natural key |
+| Indexes | 7 BTREE indexes on frequently filtered columns |
 
 ---
 
@@ -132,19 +143,18 @@ Source Files (CSV + BTS)
 | Stage | Codes | Flights |
 |-------|-------|---------|
 | Before enrichment | 306 unresolved DOT codes | 486,165 NULL airport IDs |
-| Automatic resolution | 302 codes (description match) | ~482,000 flights |
-| Manual resolution | 4 codes (civil/military) | ~8,009 flights |
+| Automatic resolution | 302 codes via description match | ~478,156 flights |
+| Manual resolution | 4 codes (civil/military shared airports) | ~8,009 flights |
 | After enrichment | 0 unresolved | 0 NULL airport IDs |
 
 ---
 
-## Known Technical Debt
+## Tests
 
-| Issue | Impact | Priority |
-|-------|--------|----------|
-| No indexes on `fct_flights` | Slow queries on 5.8M rows | High |
-| No unit or integration tests | Pipeline correctness not automated | Medium |
-| `etl_finish` uses NOW() instead of clock_timestamp() | Execution time not accurate | Low |
+| Suite | Tests | Coverage |
+|-------|-------|----------|
+| Unit (`tests/unit/`) | 22 | Pandera validators — airlines, airports, flights |
+| Integration (`tests/integration/`) | 33 | Bronze/Silver/Gold counts, business rules, referential integrity |
 
 ---
 
@@ -153,14 +163,16 @@ Source Files (CSV + BTS)
 | Term | Definition |
 |------|------------|
 | **DOT Code** | Numeric airport identifier used by the US Dept. of Transportation |
-| **IATA Code** | 2-letter airline or 3-letter airport code |
-| **BTS** | Bureau of Transportation Statistics — source of DOT→IATA mapping |
-| **SCD Tipo 1** | Slowly Changing Dimension — overwrite on change, no history |
-| **UPSERT** | INSERT + UPDATE — insert if not exists, update if exists |
-| **ON CONFLICT DO NOTHING** | Skip INSERT if unique constraint would be violated |
-| **NULLS NOT DISTINCT** | Treat NULL as equal for UNIQUE constraint purposes |
+| **IATA Code** | 2-letter airline or 3-letter airport code assigned by the International Air Transport Association |
+| **BTS** | Bureau of Transportation Statistics — source of the DOT→IATA lookup tables |
+| **SCD Tipo 1** | Slowly Changing Dimension strategy — overwrite on change, no history kept |
+| **UPSERT** | INSERT + UPDATE — insert if the record does not exist, update if it does |
+| **ON CONFLICT DO NOTHING** | Skip an INSERT if it would violate a unique constraint |
+| **NULLS NOT DISTINCT** | Treat two NULL values as equal for UNIQUE constraint purposes |
 | **Medallion Architecture** | Bronze → Silver → Gold layered data architecture |
-| **Star Schema** | One fact table surrounded by dimension tables |
-| **Surrogate Key** | System-generated integer ID replacing the natural business key |
-| **generate_series** | PostgreSQL function that generates a sequence of values |
-| **COPY FROM STDIN** | PostgreSQL bulk load — 10-50x faster than INSERT |
+| **Star Schema** | One central fact table surrounded by dimension tables |
+| **Role-Playing Dimension** | A single dimension used in multiple contexts (e.g. dim_airport as origin and destination) |
+| **Surrogate Key** | System-generated integer ID that replaces the natural business key |
+| **generate_series** | PostgreSQL set-returning function that generates a sequence of values |
+| **COPY FROM STDIN** | PostgreSQL bulk load mechanism — 10–50x faster than row-by-row INSERT |
+| **Idempotent** | Operation that produces the same result regardless of how many times it is executed |

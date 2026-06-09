@@ -5,11 +5,18 @@ from database.engine import engine
 
 
 class AirportIdRepository(BronzeRepository):
+    """Repository for bronze.airport_id_raw (BTS DOT numeric codes)."""
+
     @property
     def table_name(self) -> str:
         return "airport_id_raw"
 
     def insert(self, rows: list[dict]) -> None:
+        """Insert rows into bronze.airport_id_raw using executemany.
+
+        Args:
+            rows: List of dicts with keys matching the table columns.
+        """
         table = Table(
             self.table_name,
             MetaData(schema=self.schema_name),

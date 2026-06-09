@@ -1,14 +1,19 @@
+-- =============================================================
 -- Script Name: V14__create_usp_load_silver_flight.sql
--- Description: Creates the stored procedure that loads silver.flight_clean
---              from bronze.flights_raw. Truncate + full load strategy.
---              Translates DOT numeric airport codes to IATA codes using
---              etl.airport_dot_iata_map for origin and destination airports.
---              Logs execution start, success and errors to etl.etl_log.
+-- Description: Creates silver.usp_load_silver_flight — loads
+--              silver.flight_clean from bronze.flights_raw.
+--              Derives full_date (DATE) and date_id (YYYYMMDD INT).
+--              Translates DOT numeric airport codes to IATA codes
+--              using etl.airport_dot_iata_map via COALESCE.
+--              Truncate + full load strategy.
+--              Logs execution to etl.etl_log.
+-- Schema:      silver
 -- Author:      Michael Espinosa
 -- Date:        2026-06-05
 -- Change Log:
 --   2026-06-05 | Michael Espinosa | Initial version
 --   2026-06-06 | Michael Espinosa | Add DOT→IATA translation via airport_dot_iata_map
+-- =============================================================
 
 CREATE OR REPLACE PROCEDURE silver.usp_load_silver_flight()
 LANGUAGE plpgsql
@@ -68,9 +73,9 @@ BEGIN
         NOW()
     FROM bronze.flights_raw f
     LEFT JOIN etl.airport_dot_iata_map m_orig
-    ON CASE WHEN f.origin_airport ~ '^\d+$'
-       THEN f.origin_airport::INT
-       ELSE NULL END = m_orig.dot_code
+        ON CASE WHEN f.origin_airport ~ '^\d+$'
+           THEN f.origin_airport::INT
+           ELSE NULL END = m_orig.dot_code
     LEFT JOIN etl.airport_dot_iata_map m_dest
         ON CASE WHEN f.destination_airport ~ '^\d+$'
            THEN f.destination_airport::INT

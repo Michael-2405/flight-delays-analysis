@@ -1,11 +1,16 @@
+-- =============================================================
 -- Script Name: V12__create_usp_load_silver_airline.sql
--- Description: Creates the stored procedure that loads silver.airline_clean
---              from bronze.airlines_raw. Truncate + full load strategy.
---              Logs execution start, success and errors to etl.etl_log.
+-- Description: Creates silver.usp_load_silver_airline — loads
+--              silver.airline_clean from bronze.airlines_raw.
+--              Renames airline → airline_name.
+--              Truncate + full load strategy.
+--              Logs execution to etl.etl_log.
+-- Schema:      silver
 -- Author:      Michael Espinosa
 -- Date:        2026-06-05
 -- Change Log:
 --   2026-06-05 | Michael Espinosa | Initial version
+-- =============================================================
 
 CREATE OR REPLACE PROCEDURE silver.usp_load_silver_airline()
 LANGUAGE plpgsql

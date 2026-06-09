@@ -1,8 +1,8 @@
--- ============================================================
+-- =============================================================
 -- EDA — bronze.flights_raw
 -- Author: Michael Espinosa
--- Date: 2026-06
--- ============================================================
+-- Date:   2026-06
+-- =============================================================
 
 -- ── 1. Row count ─────────────────────────────────────────────
 SELECT COUNT(*) FROM bronze.flights_raw;
@@ -157,7 +157,7 @@ FROM bronze.flights_raw f
 LEFT JOIN bronze.airports_raw a ON f.origin_airport = a.iata_code
 WHERE a.iata_code IS NULL;
 
--- ============================================================
+-- =============================================================
 -- Findings:
 -- - 5,819,079 rows, all from 2015 (all 12 months)
 -- - tail_number: 14,721 nulls — acceptable, no dim_aircraft
@@ -166,15 +166,14 @@ WHERE a.iata_code IS NULL;
 -- - cancellation_reason: 5,729,195 nulls — expected (not cancelled)
 -- - delay breakdown columns: 4,755,640 nulls — no delay recorded
 -- - Business rules: 0 violations on both cancellation rules
--- - No true duplicates (AA803 case = same number, diff destinations)
+-- - No true duplicates (AA803 = same number, diff destinations)
 -- - Natural key must include destination_airport
--- - Delay ranges valid: dep [-82, 1988] avg=9.37 / arr [-87, 1971]
+-- - Delay ranges: dep [-82, 1988] avg=9.37 / arr [-87, 1971]
 --
--- ⚠️ Technical Debt — Airport Code Mismatch:
--- - 486,165 flights (8.4%) use DOT numeric codes not in airports_raw
--- - 306 unique numeric airport codes
--- - All major airlines affected
--- - Decision: proceed with Silver using known 322 airports
--- - Future: enrich airports_raw with DOT→IATA mapping from BTS
---   Source: https://www.transtats.bts.gov
--- ============================================================
+-- ✅ Resolved — Airport Code Mismatch (v0.4.0):
+-- - 486,165 flights (8.4%) used DOT numeric codes
+-- - 306 unique numeric airport codes identified
+-- - Resolved via etl.airport_dot_iata_map (V28)
+-- - usp_load_silver_flight translates codes via COALESCE (V14)
+-- - Result: 0 NULL airport IDs in gold.fct_flights
+-- =============================================================
