@@ -3,6 +3,8 @@ from pathlib import Path
 
 from loguru import logger
 
+LOG_DIR = Path(__file__).resolve().parent.parent.parent / "logs"
+
 
 def configure_logging() -> None:
     """Configure loguru logging for the ingestion pipeline.
@@ -14,7 +16,7 @@ def configure_logging() -> None:
 
     Creates the logs/ directory if it does not exist.
     """
-    Path("logs").mkdir(exist_ok=True)
+    LOG_DIR.mkdir(exist_ok=True)
 
     logger.remove()
 
