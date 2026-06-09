@@ -1,3 +1,10 @@
+"""Unit tests for the airlines Pandera schema validator.
+
+Validates that airlines_schema correctly accepts well-formed data
+and rejects malformed DataFrames with missing columns, extra columns,
+null values and incorrect types.
+"""
+
 import polars as pl
 import pytest
 
@@ -14,9 +21,10 @@ def valid_airlines_df() -> pl.DataFrame:
 
 
 class TestAirlinesSchema:
+    """Tests for airlines_schema validator."""
+
     def test_valid_dataframe_passes(self):
-        df = valid_airlines_df()
-        airlines_schema.validate(df)
+        airlines_schema.validate(valid_airlines_df())
 
     def test_rejects_missing_iata_code_column(self):
         df = pl.DataFrame({"AIRLINE": ["American Airlines"]})
@@ -29,7 +37,7 @@ class TestAirlinesSchema:
             airlines_schema.validate(df)
 
     def test_rejects_extra_column(self):
-        df = valid_airlines_df().with_columns(pl.lit("extra").alias("EXTRA_COLUMN"))
+        df = valid_airlines_df().with_columns(pl.lit("extra").alias("EXTRA"))
         with pytest.raises(Exception):
             airlines_schema.validate(df)
 

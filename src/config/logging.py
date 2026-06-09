@@ -5,6 +5,15 @@ from loguru import logger
 
 
 def configure_logging() -> None:
+    """Configure loguru logging for the ingestion pipeline.
+
+    Sets up two sinks:
+    - Console (stdout): INFO level with colorized output and timestamp.
+    - File (logs/pipeline.log): INFO level with 10 MB rotation,
+      30-day retention and zip compression.
+
+    Creates the logs/ directory if it does not exist.
+    """
     Path("logs").mkdir(exist_ok=True)
 
     logger.remove()

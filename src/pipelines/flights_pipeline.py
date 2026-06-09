@@ -8,9 +8,26 @@ from database.flights_repository import FlightRepository
 
 
 class FlightPipeline:
+    """Pipeline for loading flights.csv into bronze.flights_raw.
+
+    Reads the CSV in batches of 100,000 rows and uses PostgreSQL
+    COPY FROM STDIN for bulk loading. Truncate + full load strategy.
+    """
+
     BATCH_SIZE = 100_000
 
     def run(self, file_path: Path) -> int:
+        """Read and load flight data into bronze in batches.
+
+        Reads flights.csv in BATCH_SIZE chunks using Polars batched reader.
+        Each batch is loaded via COPY FROM STDIN for performance.
+
+        Args:
+            file_path: Path to flights.csv (5.8M rows, ~700 MB).
+
+        Returns:
+            Total number of rows loaded across all batches.
+        """
         logger.info(f"Starting flights ingestion from {file_path.name}")
 
         repo = FlightRepository()

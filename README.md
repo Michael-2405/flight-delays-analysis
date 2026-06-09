@@ -192,6 +192,7 @@ CALL gold.usp_load_gold_fct_flights();
 `flights_raw` uses DOT numeric airport codes (e.g. 10423) that are not standard IATA codes. This affected 486,165 flights (8.4%) with NULL airport IDs in Gold.
 
 **Resolution:**
+
 - Downloaded BTS lookup tables: `L_AIRPORT_ID.csv` (DOT codes) and `L_AIRPORT.csv` (IATA codes)
 - Built `etl.airport_dot_iata_map` — 6,778 DOT→IATA mappings by description match
 - 302 of 306 codes resolved automatically

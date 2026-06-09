@@ -1,3 +1,10 @@
+"""Unit tests for the flights Pandera schema validator.
+
+Validates that flights_schema correctly accepts well-formed data
+and rejects malformed DataFrames with missing columns, extra columns
+and incorrect types for key flight fields.
+"""
+
 import polars as pl
 import pytest
 
@@ -19,27 +26,25 @@ def valid_flights_df() -> pl.DataFrame:
 
 
 class TestFlightsSchema:
+    """Tests for flights_schema validator."""
+
     def test_valid_dataframe_passes(self):
-        df = valid_flights_df()
-        flights_schema.validate(df)
+        flights_schema.validate(valid_flights_df())
 
     def test_rejects_missing_year_column(self):
-        df = valid_flights_df().drop("YEAR")
         with pytest.raises(Exception):
-            flights_schema.validate(df)
+            flights_schema.validate(valid_flights_df().drop("YEAR"))
 
     def test_rejects_missing_airline_column(self):
-        df = valid_flights_df().drop("AIRLINE")
         with pytest.raises(Exception):
-            flights_schema.validate(df)
+            flights_schema.validate(valid_flights_df().drop("AIRLINE"))
 
     def test_rejects_missing_flight_number_column(self):
-        df = valid_flights_df().drop("FLIGHT_NUMBER")
         with pytest.raises(Exception):
-            flights_schema.validate(df)
+            flights_schema.validate(valid_flights_df().drop("FLIGHT_NUMBER"))
 
     def test_rejects_extra_column(self):
-        df = valid_flights_df().with_columns(pl.lit("extra").alias("EXTRA_COLUMN"))
+        df = valid_flights_df().with_columns(pl.lit("extra").alias("EXTRA"))
         with pytest.raises(Exception):
             flights_schema.validate(df)
 
