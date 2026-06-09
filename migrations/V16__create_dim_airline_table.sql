@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS gold.dim_airline (
 );
 
 COMMENT ON TABLE gold.dim_airline IS
-'Airlines operating US domestic flights in 2015. SCD Tipo 1.';
+'Airlines operating US domestic flights in 2015. SCD Type 1.';
 COMMENT ON COLUMN gold.dim_airline.airline_id IS
 'Surrogate key — auto-generated identity.';
 COMMENT ON COLUMN gold.dim_airline.iata_code IS

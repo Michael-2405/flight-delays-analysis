@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS gold.dim_airport (
 );
 
 COMMENT ON TABLE gold.dim_airport IS
-'US airports. Role-playing dimension — used as origin and destination in fct_flights. SCD Tipo 1.';
+'US airports. Role-playing dimension — used as origin and destination in fct_flights. SCD Type 1.';
 COMMENT ON COLUMN gold.dim_airport.airport_id IS
 'Surrogate key — auto-generated identity.';
 COMMENT ON COLUMN gold.dim_airport.iata_code IS
