@@ -1,13 +1,16 @@
+-- =============================================================
 -- Script Name: V30__create_indexes.sql
--- Description: Creates indexes on gold.fct_flights to improve query
---              performance for reporting and dashboard queries.
---              Indexes cover the most frequently filtered and grouped
---              columns based on defined business questions:
---              delays by airline, airport, date, cancellation analysis.
+-- Description: Creates BTREE indexes on gold.fct_flights to improve
+--              query performance for reporting and dashboard queries.
+--              Covers the most frequently filtered and grouped columns
+--              based on defined business questions: delay analysis by
+--              airline, airport, date and cancellation status.
+-- Schema:      gold
 -- Author:      Michael Espinosa
 -- Date:        2026-06-07
 -- Change Log:
 --   2026-06-07 | Michael Espinosa | Initial version
+-- =============================================================
 
 CREATE INDEX IF NOT EXISTS idx_fct_flights_date_id
 ON gold.fct_flights (date_id);

@@ -1,9 +1,15 @@
+-- =============================================================
 -- Script Name: V1__create_schemas.sql
--- Description: Creates the database and projects schemas. First it validates
---              that the schemas don't already exists. Which in the given case
---              case they do, then it doesn't create them.
+-- Description: Creates the four schemas used in the Medallion
+--              architecture: bronze (raw), silver (clean),
+--              gold (dimensional model) and etl (infrastructure).
+--              Uses IF NOT EXISTS to allow idempotent execution.
+-- Schema:      bronze, silver, gold, etl
 -- Author:      Michael Espinosa
--- Change Log:  First Version 01-06-2026
+-- Date:        2026-06-01
+-- Change Log:
+--   2026-06-01 | Michael Espinosa | Initial version
+-- =============================================================
 
 CREATE SCHEMA IF NOT EXISTS bronze;
 CREATE SCHEMA IF NOT EXISTS silver;

@@ -1,16 +1,20 @@
+-- =============================================================
 -- Script Name: V24__create_usp_load_gold_fct_flights.sql
--- Description: Creates the stored procedure that loads gold.fct_flights
---              from silver.flight_clean. Joins to all gold dimensions
---              to resolve surrogate keys. Incremental INSERT strategy —
---              skips duplicates using ON CONFLICT DO NOTHING on natural key
---              (date_id, airline_id, flight_number, origin_airport_id,
---              destination_airport_id).
---              Logs execution start, success and errors to etl.etl_log.
+-- Description: Creates gold.usp_load_gold_fct_flights — loads
+--              gold.fct_flights from silver.flight_clean.
+--              Resolves surrogate keys via LEFT JOINs to all
+--              four gold dimensions. Incremental INSERT strategy
+--              with ON CONFLICT DO NOTHING on natural key
+--              (date_id, airline_id, flight_number,
+--              origin_airport_id, destination_airport_id).
+--              Logs execution to etl.etl_log.
+-- Schema:      gold
 -- Author:      Michael Espinosa
 -- Date:        2026-06-06
 -- Change Log:
 --   2026-06-06 | Michael Espinosa | Initial version
 --   2026-06-06 | Michael Espinosa | Add ON CONFLICT DO NOTHING to prevent duplicates
+-- =============================================================
 
 CREATE OR REPLACE PROCEDURE gold.usp_load_gold_fct_flights()
 LANGUAGE plpgsql
@@ -23,42 +27,21 @@ BEGIN
     RAISE NOTICE '[START] usp_load_gold_fct_flights';
 
     INSERT INTO gold.fct_flights(
-        date_id,
-        airline_id,
-        origin_airport_id,
-        destination_airport_id,
-        cancellation_reason_id,
-        tail_number,
-        flight_number,
-        scheduled_departure,
-        departure_time,
-        departure_delay,
-        scheduled_arrival,
-        arrival_time,
-        arrival_delay,
-        scheduled_time,
-        elapsed_time,
-        air_time,
-        taxi_out,
-        taxi_in,
-        wheels_off,
-        wheels_on,
-        distance,
-        air_system_delay,
-        security_delay,
-        airline_delay,
-        late_aircraft_delay,
-        weather_delay,
-        is_cancelled,
-        is_diverted,
-        created_at,
-        updated_at
+        date_id, airline_id, origin_airport_id, destination_airport_id,
+        cancellation_reason_id, tail_number, flight_number,
+        scheduled_departure, departure_time, departure_delay,
+        scheduled_arrival, arrival_time, arrival_delay,
+        scheduled_time, elapsed_time, air_time,
+        taxi_out, taxi_in, wheels_off, wheels_on, distance,
+        air_system_delay, security_delay, airline_delay,
+        late_aircraft_delay, weather_delay,
+        is_cancelled, is_diverted, created_at, updated_at
     )
     SELECT
         f.date_id,
         a.airline_id,
-        orig.airport_id         AS origin_airport_id,
-        dest.airport_id         AS destination_airport_id,
+        orig.airport_id     AS origin_airport_id,
+        dest.airport_id     AS destination_airport_id,
         cr.cancellation_reason_id,
         f.tail_number,
         f.flight_number,
@@ -81,10 +64,10 @@ BEGIN
         f.airline_delay,
         f.late_aircraft_delay,
         f.weather_delay,
-        f.cancelled             AS is_cancelled,
-        f.diverted              AS is_diverted,
-        NOW()                   AS created_at,
-        NULL::TIMESTAMP         AS updated_at
+        f.cancelled         AS is_cancelled,
+        f.diverted          AS is_diverted,
+        NOW()               AS created_at,
+        NULL::TIMESTAMP     AS updated_at
     FROM silver.flight_clean f
     LEFT JOIN gold.dim_airline a
         ON f.airline = a.iata_code
