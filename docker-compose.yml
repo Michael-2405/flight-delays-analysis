@@ -13,6 +13,52 @@ services:
     networks:
       - central-db_default
 
+  superset:
+    build:
+      context: .
+      dockerfile: docker/superset/Dockerfile
+    container_name: flight_delays_superset
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    environment:
+      - SUPERSET_SECRET_KEY=${SUPERSET_SECRET_KEY}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - SUPERSET_CONFIG_PATH=/app/superset_config.py
+    volumes:
+      - superset_home:/app/superset_home
+      - ./superset_config.py:/app/superset_config.py
+    networks:
+      - central-db_default
+    depends_on:
+      - superset-init
+
+  superset-init:
+    build:
+      context: .
+      dockerfile: docker/superset/Dockerfile
+    container_name: flight_delays_superset_init
+    restart: no
+    environment:
+      - SUPERSET_SECRET_KEY=${SUPERSET_SECRET_KEY}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - SUPERSET_CONFIG_PATH=/app/superset_config.py
+    command: >
+      bash -c "
+        superset db upgrade &&
+        superset fab create-admin --username admin --firstname Admin --lastname Admin --email admin@superset.com --password ${SUPERSET_ADMIN_PASSWORD} &&
+        superset init
+      "
+    volumes:
+      - ./superset_config.py:/app/superset_config.py
+    networks:
+      - central-db_default
+
+volumes:
+  superset_home:
+
 networks:
   central-db_default:
     external: true
